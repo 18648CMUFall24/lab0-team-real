@@ -1,13 +1,14 @@
-// Simple C program to display "Hello World"
-
-// Header file for input output functions
-#include <linux/kernel.h>  // Needed for printk
-
-// Main function: entry point for execution
-int main(void) {
-
-    // writing print statement to print hello world
-    printk(KERN_INFO "Hello, world! Kernel-space -- the land of the free and the home of the brave.");
-
-    return 0;
+#include <linux/init.h>
+#include <linux/module.h>
+MODULE_LICENSE("Dual BSD/GPL");
+static int hello_init(void)
+{
+ printk(KERN_ALERT "Hello, world! It's warm and cozy here in user-space.\n");
+ return 0;
 }
+static void hello_exit(void)
+{
+ printk(KERN_ALERT "Goodbye, cruel world\n");
+}
+module_init(hello_init);
+module_exit(hello_exit);
