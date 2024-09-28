@@ -1,8 +1,35 @@
-EXTRA_CFLAGS="-fsigned-char -march=armv7-a -mfloat-abi=softfp -mfpu=vfp -fdata-sections -ffunction-sections -fexceptions -mthumb -fPIC -Wno-psabi -DANDROID -D__ARM_ARCH_5__ -D__ARM_ARCH_5T__ -D__ARM_ARCH_5E__ -D__ARM_ARCH_5TE__ -fomit-frame-pointer --sysroot $SYSROOT $INCLUDES"
-EXTRA_LDFLAGS= "-rdynamic --sysroot $SYSROOT -Wl,--gc-sections -L$LIBSTDCPP/$NDK_GCC/libs/armeabi-v7a -lgnustl_static -lsupc++"
-EXP_HDRS=$(HOME)/kernel/usr/include
-CC=arm-linux-gnueabi-gcc
+NDK=$(HOME)/android-ndk-r9
+NDK_TC=arm-linux-androideabi-4.8
+NDK_API=android-14
+NDK_GCC=4.8
+SYSROOT=$(NDK)/platforms/$(NDK_API)/arch-arm
+LIBSTDCPP=$(NDK)/sources/cxx-stl/gnu-libstdc++/$(NDK_GCC)
+
+EXP_HDRS=$(HOME)/Documents/lab0-team-real/usr/include
+
+CC=$(NDK)/toolchains/$(NDK_TC)/prebuilt/linux-x86_64/bin/arm-linux-androideabi-gcc
+
+INCLUDES = -isystem $(EXP_HDRS) \
+	   -isystem $(SYSROOT)/usr/include/ \
+	   -isystem $(LIBSTDCPP)/include/ \
+	   -isystem $(LIBSTDCPP)/include/backward \
+	   -isystem $(LIBSTDCPP)/libs/armeabi-v7a/include
+
+EXTRA_CFLAGS = --sysroot $(SYSROOT) \
+	       -fsigned-char -march=armv7-a -mfloat-abi=softfp -mfpu=vfp \
+	       -fdata-sections -ffunction-sections -fexceptions -mthumb -fPIC \
+	       -Wno-psabi -DANDROID -D__ARM_ARCH_5__ -D__ARM_ARCH_5T__ \
+	       -D__ARM_ARCH_5E__ -D__ARM_ARCH_5TE__ -fomit-frame-pointer \
+	        $(INCLUDES)
+
+EXTRA_LDFLAGS = --sysroot $(SYSROOT) \
+	        -Wl,--gc-sections \
+	        -L$(LIBSTDCPP)/libs/armeabi-v7a \
+		-lgnustl_static -lsupc++
 
 hello: hello.c
-	$(CC) -o hello -isystem $(EXP_HDRS) $(EXTRA_CFLAGS) $(EXTRA_LDFLAGS) hello.c
+	$(CC) -o hello  $(EXTRA_CFLAGS) $(EXTRA_LDFLAGS) hello.c
+
+clean:
+	rm -f hello
 
