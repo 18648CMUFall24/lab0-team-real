@@ -52,7 +52,7 @@ int32_t parse_param(const char* param) {
 }
 
 int64_t reverse_number(int64_t num, int8_t num_bits) {
-	int64_t out = 0;
+	int64_t out = 1; // Need extra 1 to account for trailing 0s
 	while (num > 0) {
 		out *= 10;
 		out += num % 10;
@@ -61,7 +61,8 @@ int64_t reverse_number(int64_t num, int8_t num_bits) {
 	return out;
 }
 
-int write_result(char* result_buf, int64_t result, int8_t whole_bits, int8_t decimal_bits) {
+void write_result(char* result_buf, int64_t result, int8_t whole_bits, int8_t decimal_bits) {
+	// Need a check that result_buf is long enough? 
 	int64_t decimal_mask = (1 << decimal_bits) - 1;
 	int64_t decimal_part = result & decimal_mask;
 	int64_t whole_part = result >> decimal_bits;
@@ -69,9 +70,7 @@ int write_result(char* result_buf, int64_t result, int8_t whole_bits, int8_t dec
 	int64_t reversed_whole = reverse_number(whole_part);
 	int64_t reversed_decimal = reverse_number(decimal_part); 
 
-	while (revesed_deci
-
-	while (reversed_whole > 0) {
+	while (reversed_whole > 1) {
 		*result_buf = '0' + (reversed_whole % 10);
 		reversed_whole /= 10;
 		result_buf++;
@@ -80,10 +79,11 @@ int write_result(char* result_buf, int64_t result, int8_t whole_bits, int8_t dec
 	*result_buf = '.';
 	result_buf++;
 
-	while () {
+	while (reversed_decimal > 1) {
+		*result_buf = '0' + (reversed_decimal % 10);
+		reversed_decimal /= 10;
+		result_buf++;
 	}
-
-
 }
 
 int sys_calc(const char* param1, const char* param2, char operation, char* result) {
