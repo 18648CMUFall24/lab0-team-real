@@ -3,7 +3,7 @@
 MODULE_LICENSE("Dual BSD/GPL");
 static int hello_init(void)
 {
- printk(KERN_ALERT "Hello, world! It's warm and cozy here in user-space.\n");
+ printk(KERN_ALERT "Hello, world! Kernel-space -- the land of the free and home of the brave.\n");
  return 0;
 }
 static void hello_exit(void)

@@ -7,7 +7,7 @@
 int main() {
 
     // writing print statement to print hello world
-    printf("Hello, world! It's warm and cozy here in user-space.");
+    printf("Hello, world! It's warm and cozy here in user-space.\n");
 
     return 0;
 }
