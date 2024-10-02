@@ -6,6 +6,8 @@ const int32_t PARSE_FAIL = -1;
 const int32_t WHOLE_MULTIPLIER = 1000;
 const int32_t MAX_DECIMAL_PLACES = 3;
 
+
+
 #define INC(N) if (decimal_seen) { decimal *= 10; decimal += (N); decimal_count++; } \
 		else{whole *= 10; whole += (N); } 
 
@@ -146,5 +148,10 @@ int sys_calc(const char* param1, const char* param2, char operation, char* resul
 	}
 
 	return 0;
+}
+
+SYSCALL_DEFINE4(calc, const char*, param1, const char*, param2, char, operation, char*, result)
+{
+	return sys_calc(param1, param2, operatation, result);
 }
 
