@@ -4,8 +4,7 @@
 #include <linux/device.h>
 #include <linux/kernel.h>
 #include <linux/uaccess.h>
-#include <linux/fs.h>
-#include <linux/slab.h>   
+#include <linux/fs.h> 
 
 //File Operation 
 static int psdev_open(struct inode *inode, struct file *file);
@@ -33,17 +32,29 @@ struct psdev_device_data{
 
 
 static struct psdev_device_data *characterDriverDevice;
+dev_t devNumber;
 
 static int psdev_open(struct inode *inode, struct file *file)
 {
-
-    return -1;
+    struct psdev_device_data *device = container_of(inode->i_cdev, struct psdev_device_data, cdev);
+    
+    if(device->is_open)
+    {
+        return -EBUSY;
+    }
+    
+    device->is_open = 1;
+    printk(KERN_INFO "Device opened\n");
+    return 0;
 
 }
 
 static int psdev_release(struct inode *inode, struct file *file)
 {
-    return -1;
+    struct psdev_device_data *device = container_of(inode->i_cdev, struct psdev_device_data, cdev);
+    device->is_open = 0;
+    printk(KERN_INFO "Device closed\n");
+    return 0;
 }
 
 static long psdev_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
@@ -65,11 +76,10 @@ static ssize_t psdev_write(struct file *file, const char __user *buf, size_t cou
 
 static int psdev_init(void)
 {
-    dev_t dev;
     int allocRet;
 
     //allocate major number
-    allocRet = alloc_chrdev_region(&dev, 0,1,"psdev");
+    allocRet = alloc_chrdev_region(&devNumber, 0,1,"psdev");
 
     if(allocRet != 0)
     {
@@ -82,17 +92,18 @@ static int psdev_init(void)
     characterDriverDevice->is_open = 0;
 
     //Add the chacater driver
-    cdev_add(&characterDriverDevice->cdev,dev,1);
+    cdev_add(&characterDriverDevice->cdev,devNumber,1);
 
 
-    printk(KERN_INFO "Character device registered with major number %d\n", MAJOR(dev));
+    printk(KERN_INFO "Character device registered with major number %d\n", MAJOR(devNumber));
     return 0;
     
 }
 
 static void psdev_exit(void)
 {
- printk(KERN_ALERT "Goodbye, cruel world\n");
+    cdev_del(&characterDriverDevice->cdev);
+    printk(KERN_INFO "Character device unregistered %d\n", MAJOR(devNumber));
 }
 
 
