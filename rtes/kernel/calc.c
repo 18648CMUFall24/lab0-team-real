@@ -1,4 +1,7 @@
 #include <linux/kernel.h>
+#include <linux/errno.h>
+#include <linux/syscalls.h>
+#include <linux/math64.h>
 
 const uint16_t DECIMAL_MASK = (1 << 10) - 1;
 const uint32_t WHOLE_MASK = (1 << 16) - 1;
@@ -6,22 +9,27 @@ const int32_t PARSE_FAIL = -1;
 const int32_t WHOLE_MULTIPLIER = 1000;
 const int32_t MAX_DECIMAL_PLACES = 3;
 
-
-
 #define INC(N) if (decimal_seen) { decimal *= 10; decimal += (N); decimal_count++; } \
-		else{whole *= 10; whole += (N); } 
+else{whole *= 10; whole += (N); } 
 
 // Returns WHOLE_PART * 1000 + DECIMAL_PART
 // Returns a negative number upon failure
 // Has 16 + 10 == 26 significant bits 
 int32_t parse_param(const char* param) {
+	char *c;
+	size_t decimal_count;
+	uint32_t whole;
+	uint16_t decimal;
+	bool decimal_seen;
+
+
 	if (param == NULL) return PARSE_FAIL;
 
-	char *c = (char*) param;
-	bool decimal_seen = false;
-	size_t decimal_count = 0;
-	uint32_t whole = 0;
-	uint16_t decimal = 0;
+	c = (char*) param;
+	decimal_seen = false;
+	decimal_count = 0;
+	whole = 0;
+	decimal = 0;
 	while (c && *c) {
 		switch (*c) {
 			case '.':
@@ -61,69 +69,81 @@ int32_t parse_param(const char* param) {
 
 int64_t reverse_whole(int64_t num) {
 	int64_t out = 1; // Need extra 1 to account for trailing 0s
+	int32_t rem;
 	while (num > 0) {
 		out *= 10;
-		out += num % 10;
-		num /= 10;
+		num = div_s64_rem(num, 10, &rem);
+		out += rem;
 	}
 	return out;
 }
 
 int64_t reverse_decimal(int64_t dec) {
+	size_t i;
 	int64_t out = 0; 
-	for (size_t i = 0; i < MAX_DECIMAL_PLACES; i++) {
+	int32_t rem;
+
+	for (i = 0; i < MAX_DECIMAL_PLACES; i++) {
 		out *= 10;
-		out += dec % 10;
-		dec /= 10;
+		dec = div_s64_rem(dec, 10, &rem);
+		out += rem;
 	}
 	return out;
 }
 
 void write_result(char* result_buf, int64_t result, size_t decimal_mask) {
-	// Need a check that result_buf is long enough? 
-	
-	int64_t decimal_part = result % decimal_mask;
-	int64_t whole_part = result / decimal_mask;
+	size_t i;
+	int64_t whole_part, reversed_whole;
+	int32_t decimal_part, reversed_decimal, rem;
+	char value;
 
-	int64_t reversed_whole = reverse_whole(whole_part);
-	int64_t reversed_decimal = reverse_decimal(decimal_part); 
 
-    // The one prevents trailing 0s from getting dropped
+	whole_part = div_s64_rem(result, decimal_mask, &decimal_part);
+
+	reversed_whole = reverse_whole(whole_part);
+	reversed_decimal = reverse_decimal(decimal_part); 
+
+	// The one prevents trailing 0s from getting dropped
 	while (reversed_whole > 1) {
-		char value = '0' + (reversed_whole % 10);
+		reversed_whole = div_s64_rem(reversed_whole, 10, &rem);
+		value = '0' + rem;
 		*result_buf = value;
-		reversed_whole /= 10;
 		result_buf++;
 	}
 
 	*result_buf = '.';
 	result_buf++;
 
-	for (size_t i = 0; i < MAX_DECIMAL_PLACES; i++) {
-		char value = '0' + (reversed_decimal % 10);
+	for (i = 0; i < MAX_DECIMAL_PLACES; i++) {
+		reversed_decimal = div_s64_rem(reversed_decimal, 10, &rem);
+		value = '0' + rem;
 		*result_buf = value;
-		reversed_decimal /= 10;
-        result_buf++;
+		result_buf++;
 	}
 }
 
 void print_negative(char* result_buf, int64_t x) {
-	int64_t neg = ~x + 1;
-    *result_buf = '-';
-    result_buf++;
+	int64_t neg;
+
+	neg = ~x + 1;
+	*result_buf = '-';
+	result_buf++;
 	write_result(result_buf, neg, MAX_DECIMAL_PLACES);
 }
 
-int sys_calc(const char* param1, const char* param2, char operation, char* result) {
-	if (result == NULL) return EINVAL;
+int do_calc(const char* param1, const char* param2, char operation, char* result) {
+	int64_t p1, p2, output;
 
-	int64_t p1 = parse_param(param1);
+	if (result == NULL) return EINVAL;
+	// Need a check that result_buf is long enough? 
+
+	p1 = parse_param(param1);
 	if (p1 < 0) return EINVAL;
 
-	int64_t p2 = parse_param(param2);
+	p2 = parse_param(param2);
 	if (p2 < 0) return EINVAL;
 
-	int64_t output = 0;
+	output = 0;
 	switch (operation) {
 		case '+': 
 			output = p1 + p2;
@@ -131,7 +151,7 @@ int sys_calc(const char* param1, const char* param2, char operation, char* resul
 			break;
 		case '-': 
 			output = p1 - p2;
-			if (p2 > p1) print_negative(output);
+			if (p2 > p1) print_negative(result, output);
 			else write_result(result, output, WHOLE_MULTIPLIER);
 			break;
 		case '*': 
@@ -140,7 +160,7 @@ int sys_calc(const char* param1, const char* param2, char operation, char* resul
 			break;
 		case '/': 
 			if (p2 == 0) return EINVAL;
-			output = (p1 * WHOLE_MULTIPLIER) / p2;
+			output = div64_s64(p1 * WHOLE_MULTIPLIER, p2);
 			write_result(result, output, WHOLE_MULTIPLIER);
 			break;
 		default:
@@ -150,8 +170,8 @@ int sys_calc(const char* param1, const char* param2, char operation, char* resul
 	return 0;
 }
 
-SYSCALL_DEFINE4(calc, const char*, param1, const char*, param2, char, operation, char*, result)
+SYSCALL_DEFINE4(calc, const char*, param1, const char*, param2, char, operation, char*, result) 
 {
-	return sys_calc(param1, param2, operatation, result);
+	return do_calc(param1, param2, operation, result);
 }
 
