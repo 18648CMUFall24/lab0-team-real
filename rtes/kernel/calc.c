@@ -91,14 +91,14 @@ int64_t reverse_decimal(int64_t dec) {
 	return out;
 }
 
-void write_result(char* result_buf, int64_t result, size_t decimal_mask) {
+void write_result(char* result_buf, int64_t result) {
 	size_t i;
 	int64_t whole_part, reversed_whole;
 	int32_t decimal_part, reversed_decimal, rem;
 	char value;
 
 
-	whole_part = div_s64_rem(result, decimal_mask, &decimal_part);
+	whole_part = div_s64_rem(result, WHOLE_MULTIPLIER, &decimal_part);
 
 	reversed_whole = reverse_whole(whole_part);
 	reversed_decimal = reverse_decimal(decimal_part); 
@@ -128,7 +128,7 @@ void print_negative(char* result_buf, int64_t x) {
 	neg = ~x + 1;
 	*result_buf = '-';
 	result_buf++;
-	write_result(result_buf, neg, MAX_DECIMAL_PLACES);
+	write_result(result_buf, neg);
 }
 
 int do_calc(const char* param1, const char* param2, char operation, char* result) {
@@ -147,21 +147,21 @@ int do_calc(const char* param1, const char* param2, char operation, char* result
 	switch (operation) {
 		case '+': 
 			output = p1 + p2;
-			write_result(result, output, WHOLE_MULTIPLIER);
+			write_result(result, output);
 			break;
 		case '-': 
 			output = p1 - p2;
 			if (p2 > p1) print_negative(result, output);
-			else write_result(result, output, WHOLE_MULTIPLIER);
+			else write_result(result, output);
 			break;
 		case '*': 
-			output = p1 * p2;
-			write_result(result, output, WHOLE_MULTIPLIER * WHOLE_MULTIPLIER);
+			output = div64_s64(p1 * p2, WHOLE_MULTIPLIER);
+			write_result(result, output);
 			break;
 		case '/': 
 			if (p2 == 0) return EINVAL;
 			output = div64_s64(p1 * WHOLE_MULTIPLIER, p2);
-			write_result(result, output, WHOLE_MULTIPLIER);
+			write_result(result, output);
 			break;
 		default:
 			return EINVAL;
