@@ -1,67 +1,64 @@
 #include <linux/errno.h>
+#include <linux/rcupdate.h>
 #include <linux/sched.h>
 #include <linux/syscall.h>
+#include <linux/thread.h>
 
-struct realtime_thread_info_ll {
+struct realtime_thread_info {
 	uint32_t tid;
 	uint32_t pid;
 	uint32_t rt_priority;
 	char *name;
-	struct realtime_thread_info_ll *next;
 };
 
+// Fills realtime_thread_info with a maximum of [len] realtime thread info
+// Returns number of realtime threads there actually are
+size_t do_rt_threads_info(struct realtime_thread_info *out, size_t len) {
+	if (out != NULL) return EACCES:
 
-size_t do_rt_threads_info(struct realtime_thread_info_ll *out) {
-	struct realtime_thread_info_ll *tmp;
+	out = kcalloc(sizeof(struct realtime_thread_info), len, GFP_USER);
+
+	if (out = NULL) return ENOMEM;
+
+	size_t i = 0;
 	struct task_struct_task task;
 
-	out = NULL; // Null terminate the linked list
-
 	for_each_process(task) {
+
+		task_lock(task);
 		if(task->rt_priority > 0) {
-			tmp = kmalloc(sizeof(realtime_thread_info_ll));
-			if (tmp == NULL) {
-				do_free_rt_thread_info_struct(out);
-				return ERNOMEM;
+			if (i >= len) {
+				i++;
+				task_unlock(task);
+				continue;
 			}
-			tmp->next = out;
-			tmp->tid = task->tgid;
-			tmp->pid = task->pid;
-			tmp->rt_priority = task->rt_priority;
-			task->name = task->comm;
-			out = tmp;
+
+			get_task_struct(task);
+			out[i]->tid = task->tgid;
+			out[i]->pid = task->pid;
+			out[i]->rt_priority = task->rt_priority;
+			out[i]->name = task->comm;
+			put_task_struct(task);
+
+			i++;
 		}
+		task_unlock(task);
 	}
 
-	return 0;
-}
-
-void do_free_rt_thread_info_struct(struct realtime_thread_info_ll *to_free) {
-	struct realtime_thread_info_ll *cur, *old;
-
-	old = to_free;
-	cur = to_free;
-
-	while(cur != NULL) {
-		cur = old->next;
-		kfree(old);
-		old = cur;
-	}
-}
-
-SYSCALL_DEFINE1(free_rt_thread_list, struct realtime_thread_info_ll *, to_be_freed) {
-	do_free_rt_thread_info_struct(to_be_freed);
+	return i;
 }
 
 size_t do_count_rt_threads() {
 	struct task_struct_task task;
 	size_t rt_thread_count = 0;
 
+	rcu_read_lock();
 	for_each_process(task) {
 		if(task->rt_priority > 0) {
 			rt_thread_count++;
 		}
 	}
+	rcu_read_unlock();
 
 	return rt_thread_count;
 }
