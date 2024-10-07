@@ -8,7 +8,7 @@
 #include <linux/slab.h>
 #include <linux/sched.h>
 //#include <linux/sched/signal.h>
-//#include <linux/rcupdate.h>  // For RCU lockin
+#include <linux/rcupdate.h>  // For RCU lockin
 
 
 #define BUFFER_SIZE    4096
@@ -55,14 +55,6 @@ static int psdev_open(struct inode *inode, struct file *file)
         return -EBUSY;
     }
     
-    //allocate memory for the buffer
-    // device->buffer = kmalloc(BUFFER_SIZE, GFP_KERNEL);
-    // if (!device->buffer) {
-    //     printk(KERN_INFO "psdev: Failed to allocate memory for buffer\n");
-    //     return -ENOMEM;  // Return an error if buffer allocation fails
-    // }
-
-  
     device->is_open = 1;
     file->private_data = device;
     printk(KERN_INFO "Device opened\n");
@@ -74,7 +66,6 @@ static int psdev_release(struct inode *inode, struct file *file)
 {
     struct psdev_device_data *device = container_of(inode->i_cdev, struct psdev_device_data, cdev);
     device->is_open = 0;
-    // //kfree(device->buffer);
     printk(KERN_INFO "Device closed\n");
     return 0;
 }
@@ -103,7 +94,7 @@ static ssize_t psdev_read(struct file *file, char __user *buf, size_t count, lof
     //lock to read the task list
     rcu_read_lock();
 
-    //
+    //go through each
     for_each_process(task)
     {
         if(task->rt_priority > 0)
