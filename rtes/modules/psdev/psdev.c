@@ -6,10 +6,9 @@
 #include <linux/uaccess.h>
 #include <linux/fs.h> 
 #include <linux/slab.h>
-#include <linux/rcupdate.h>
 #include <linux/sched.h>
 //#include <linux/sched/signal.h>
-#include <linux/rcupdate.h>  // For RCU lockin
+//#include <linux/rcupdate.h>  // For RCU lockin
 
 
 #define BUFFER_SIZE    4096
@@ -102,7 +101,7 @@ static ssize_t psdev_read(struct file *file, char __user *buf, size_t count, lof
     length = length + snprintf(buffer+length,BUFFER_SIZE-length, "tid\tpid\tpr\tname \n");
 
     //lock to read the task list
-    //__rcu_read_lock();
+    rcu_read_lock();
 
     //
     for_each_process(task)
@@ -125,7 +124,7 @@ static ssize_t psdev_read(struct file *file, char __user *buf, size_t count, lof
         buffer[BUFFER_SIZE-1] = '\0';
     }
     //unlock since done reading the task list
-    //__rcu_read_unlock();
+    rcu_read_unlock();
 
     //copy only specific points from buffer
     remainingSize = length - *offset;
