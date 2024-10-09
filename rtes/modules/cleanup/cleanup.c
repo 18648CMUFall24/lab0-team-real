@@ -8,11 +8,15 @@
 #include <linux/kernel.h>
 #include <linux/kallsyms.h>
 #include <linux/fdtable.h>
-#include <linux/fs.h>
 #include <linux/string.h>
+#include <linux/slab.h> 
+#include <linux/stat.h>
 
 #include <asm/unistd.h>
 #include <asm/pgtable.h>
+
+
+#define MAX_BUFFER_LENGTH     4096
 
 unsigned long *syscall_table;
 
@@ -27,26 +31,36 @@ module_param(comm, charp, 0644);
 asmlinkage long temp_sys_exit_group(int error_code)
 {
     struct task_struct *task = current;
-    // struct fdtable *fdt;
-    // struct file *file;
-    // int fd;
-
+    int found = 0;
+    char *buffer;
+    char *pathname; 
+    
     if(comm && strstr(task->comm, comm))
     {
         struct fdtable *fdt = files_fdtable(task->files);
         int fd;
-        int filesFound = 0;
-        /**/
+        buffer = kmalloc(MAX_BUFFER_LENGTH, GFP_ATOMIC);
+        
         spin_lock(&task->files->file_lock);
         for(fd = 0; fd < fdt->max_fds; fd++)
         {
-            if(fdt->fd[fd] && !filesFound)
-            {
-                printk("cleanup: process %s (PID %d) did not close files:\n", task->comm, task->pid);
-                filesFound = 1;
+            struct file *file = fdt->fd[fd];
+            
+            if(file && S_ISREG(file->f_path.dentry->d_inode->i_mode))
+            {                                                                             
+                if(!found)
+                {
+                    printk("cleanup: process %s (PID %d) did not close files:\n", task->comm, task->pid);
+                    found = 1;
+                } 
+
+                pathname = d_path(&file->f_path, buffer, MAX_BUFFER_LENGTH);
+                printk(KERN_INFO " %s\n", pathname);
             }
         }
-        
+        spin_unlock(&task->files->file_lock);
+
+        kfree(buffer);
     }
 
     //printk(KERN_ALERT "Entered the temp sys call %s !\n", task->comm)
