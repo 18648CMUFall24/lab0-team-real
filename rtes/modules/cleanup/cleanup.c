@@ -46,16 +46,16 @@ asmlinkage long temp_sys_exit_group(int error_code)
         {
             struct file *file = fdt->fd[fd];
             
-            if(file && S_ISREG(file->f_path.dentry->d_inode->i_mode))
+            if(file) //&& S_ISREG(file->f_path.dentry->d_inode->i_mode))
             {                                                                             
                 if(!found)
                 {
                     printk("cleanup: process %s (PID %d) did not close files:\n", task->comm, task->pid);
                     found = 1;
                 } 
-
+                
                 pathname = d_path(&file->f_path, buffer, MAX_BUFFER_LENGTH);
-                printk(KERN_INFO " %s\n", pathname);
+                printk(KERN_INFO "cleanup: %s\n", pathname);
             }
         }
         spin_unlock(&task->files->file_lock);
