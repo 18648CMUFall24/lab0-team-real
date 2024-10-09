@@ -13,7 +13,7 @@ struct process_info {
 	int32_t pid;
 	int32_t tid;
 	int32_t rt_priority;
-	char name[MAX_TASK_NAME+1];
+	char name[MAX_TASK_NAME];
 };
 
 
@@ -36,9 +36,13 @@ void clean_exit(int sig) {
 	exit(0);
 }
 
+void clear_lines() {
+	printf("\033[2J\n"); // Reset lines
+}
+
 int main() {
 	struct process_info pinfo[MAX_PROCESSES];
-	int32_t ret, max_seen, i;
+	int32_t ret, i;
 
 	signal(SIGINT, clean_exit);
 
@@ -50,9 +54,8 @@ int main() {
 
 		if (ret < 0) 
 			clean_exit(ret);
-		if (ret < max_seen)
-			max_seen = ret;
 
+		clear_lines();
 		reset_cursor();
 
 		printf("PID\t\tTID\t\tRT_PRIORITY\tNAME\n");
@@ -66,9 +69,6 @@ int main() {
 			  	pinfo[i].name
 			);
 		}
-
-		for (i = ret; i < max_seen; i++) 
-			printf("\33[2K\r\n");
 
 		hide_cursor();
 
