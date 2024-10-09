@@ -10,7 +10,7 @@ struct realtime_thread_info {
 	uint32_t tid;
 	uint32_t pid;
 	uint32_t rt_priority;
-	char name[TASK_COMM_LEN+1];
+	char name[TASK_COMM_LEN];
 };
 
 // Fills realtime_thread_info with a maximum of [len] realtime thread info
@@ -26,14 +26,10 @@ int32_t do_rt_threads_info(struct realtime_thread_info __user *out, size_t len) 
 
 	rcu_read_lock();
 	for_each_process(task) {
-		task_lock(task);
 
 		if(task->rt_priority > 0) {
-			get_task_struct(task);
 			if (count >= len) {
 				count++;
-				put_task_struct(task);
-				task_unlock(task);
 				continue;
 			}
 
@@ -43,17 +39,12 @@ int32_t do_rt_threads_info(struct realtime_thread_info __user *out, size_t len) 
 			get_task_comm(rt_pinfo.name, task);
 
 			if (copy_to_user(&out[count], &rt_pinfo, sizeof(rt_pinfo))) {
-				put_task_struct(task);
-				task_unlock(task);
 				rcu_read_unlock();
 				return -EFAULT;
 			}
 
-			put_task_struct(task);
 			count++;
 		}
-
-		task_unlock(task);
 	}
 	rcu_read_unlock();
 

@@ -1,5 +1,5 @@
 #include <signal.h>
-#include <stdbool.h>
+#include <stdbool.h> 
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,9 +10,9 @@
 #define MAX_TASK_NAME 16
 
 struct process_info {
-	uint32_t pid;
-	uint32_t tid;
-	uint32_t rt_priority;
+	int32_t pid;
+	int32_t tid;
+	int32_t rt_priority;
 	char name[MAX_TASK_NAME+1];
 };
 
@@ -38,7 +38,7 @@ void clean_exit(int sig) {
 
 int main() {
 	struct process_info pinfo[MAX_PROCESSES];
-	int32_t ret, last_seen, i;
+	int32_t ret, max_seen, i;
 
 	signal(SIGINT, clean_exit);
 
@@ -50,15 +50,16 @@ int main() {
 
 		if (ret < 0) 
 			clean_exit(ret);
+		if (ret < max_seen)
+			max_seen = ret;
 
 		reset_cursor();
-		hide_cursor();
 
-		printf("PID\tTID\tRT_PRIORITY\tNAME\n");
-		printf("-----------------------------------------------\n");
+		printf("PID\t\tTID\t\tRT_PRIORITY\tNAME\n");
+		printf("-------------------------------------------------------------------------\n");
 
 		for (i = 0; i < ret; i++) {
-			printf("%d\t%d\t\%d\t%s\n", 
+			printf("% 10d\t% 10d\t\% 10d\t%s\n", 
 			  	pinfo[i].pid, 
 			  	pinfo[i].tid, 
 			  	pinfo[i].rt_priority,
@@ -66,9 +67,10 @@ int main() {
 			);
 		}
 
-		for (i = ret; i < last_seen; i++) 
-			printf("\n");
-		last_seen = ret;
+		for (i = ret; i < max_seen; i++) 
+			printf("\33[2K\r\n");
+
+		hide_cursor();
 
 		sleep(2);
 	}
