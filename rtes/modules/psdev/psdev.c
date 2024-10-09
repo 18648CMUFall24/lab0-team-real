@@ -7,7 +7,6 @@
 #include <linux/fs.h> 
 #include <linux/slab.h>
 #include <linux/sched.h>
-//#include <linux/sched/signal.h>
 #include <linux/rcupdate.h>  // For RCU lockin
 
 
@@ -37,9 +36,6 @@ struct psdev_device_data{
 
 
 static struct psdev_device_data characterDriverDevice;
-
-// sysfs class structure
-//static struct class *psdevdev_class = NULL;
 
 dev_t devNumber;
 
@@ -174,8 +170,7 @@ static int __init psdev_init(void)
     //Add the chacater driver
     cdev_add(&characterDriverDevice.cdev,devNumber,1);
 
-    //psdevdev_class = class_create(THIS_MODULE, "psdev");
-    //device_create(psdevdev_class, NULL, devNumber, NULL, "psdev");
+
     
     printk(KERN_INFO "Character device registered with major number %d\n", MAJOR(devNumber));
    
@@ -186,9 +181,6 @@ static int __init psdev_init(void)
 
 static void __exit psdev_exit(void)
 {
-    //device_destroy(psdevdev_class,devNumber);
-    //class_unregister(psdevdev_class);
-    //class_destroy(psdevdev_class);
     cdev_del(&characterDriverDevice.cdev);
     unregister_chrdev_region(devNumber, 1);
 
