@@ -1,14 +1,19 @@
+#include <signal.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/syscall.h>
 #include <unistd.h>
 
-struct processe_info {
+#define MAX_PROCESSES 1024
+#define MAX_TASK_NAME 16
+
+struct process_info {
 	uint32_t pid;
 	uint32_t tid;
 	uint32_t rt_priority;
-	char *name;
+	char name[16];
 };
 
 
@@ -33,25 +38,27 @@ void clean_exit(int sig) {
 
 int main() {
 	struct process_info pinfo[MAX_PROCESSES];
-	int32_t ret, max_seen, i;
+	int32_t ret, last_seen, i;
 
-	signal(SIGINT, handle_sigint);
+	signal(SIGINT, clean_exit);
 
 	system("clear");
 	hide_cursor();
 
 	while(true) {
-		ret = syscall(__NR_listrt, pinfo, MAX_PROCESSES);
+		/*
+		ret = syscall(__NR_list_rt_threads, &pinfo, MAX_PROCESSES);
 		if (ret < 0) 
 			clean_exit(ret);
 
-		if (ret > max_seen) 
-			max_seen = ret;
+		*/
 
 		reset_cursor();
 		printf("PID\tTID\tRT_PRIORITY\tNAME\n");
 		printf("-----------------------------------------------\n");
 
+		// printf("%d realtime processes running\n", ret);
+		/*
 		for (i = 0; i < ret; i++) {
 			printf("%d\t%d\t\%d\t%s\n", 
 			  	pinfo[i].pid, 
@@ -63,6 +70,8 @@ int main() {
 
 		for (i = ret; i < max_seen; i++) 
 			printf("\n");
+		*/
+		// last_seen = ret;
 
 		sleep(2);
 	}

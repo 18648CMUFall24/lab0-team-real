@@ -405,7 +405,6 @@
 #define __NR_calc			(__NR_SYSCALL_BASE+376)
 #define __NR_count_rt_threads		(__NR_SYSCALL_BASE+377)
 #define __NR_list_rt_threads		(__NR_SYSCALL_BASE+378)
-#define __NR_free_rt_thread_list	(__NR_SYSCALL_BASE+379)
 
 /*
  * The following SWIs are ARM private.

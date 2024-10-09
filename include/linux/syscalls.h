@@ -63,6 +63,7 @@ struct getcpu_cache;
 struct old_linux_dirent;
 struct perf_event_attr;
 struct file_handle;
+struct realtime_thread_info;
 
 #include <linux/types.h>
 #include <linux/aio_abi.h>
@@ -850,5 +851,8 @@ asmlinkage long sys_calc(const char* param1,
 			 const char* param2, 
 			 char operation, 
 			 char* result);
+
+asmlinkage long sys_count_rt_threads(void);
+asmlinkage long sys_list_rt_threads(struct realtime_thread_info *out, size_t len);
 
 #endif
