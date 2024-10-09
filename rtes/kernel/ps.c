@@ -10,7 +10,7 @@ struct realtime_thread_info {
 	uint32_t tid;
 	uint32_t pid;
 	uint32_t rt_priority;
-	char name[TASK_COMM_LEN];
+	char name[TASK_COMM_LEN+1];
 };
 
 // Fills realtime_thread_info with a maximum of [len] realtime thread info
@@ -40,7 +40,7 @@ int32_t do_rt_threads_info(struct realtime_thread_info __user *out, size_t len) 
 			rt_pinfo.tid = task->tgid;
 			rt_pinfo.pid = task->pid;
 			rt_pinfo.rt_priority = task->rt_priority;
-			get_task_comm(&rt_pinfo.name, task);
+			get_task_comm(rt_pinfo.name, task);
 
 			if (copy_to_user(&out[count], &rt_pinfo, sizeof(rt_pinfo))) {
 				put_task_struct(task);

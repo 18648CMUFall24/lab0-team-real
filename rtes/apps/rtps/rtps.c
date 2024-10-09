@@ -13,7 +13,7 @@ struct process_info {
 	uint32_t pid;
 	uint32_t tid;
 	uint32_t rt_priority;
-	char name[16];
+	char name[MAX_TASK_NAME+1];
 };
 
 
@@ -46,32 +46,29 @@ int main() {
 	hide_cursor();
 
 	while(true) {
-		/*
 		ret = syscall(__NR_list_rt_threads, &pinfo, MAX_PROCESSES);
+
 		if (ret < 0) 
 			clean_exit(ret);
 
-		*/
-
 		reset_cursor();
+		hide_cursor();
+
 		printf("PID\tTID\tRT_PRIORITY\tNAME\n");
 		printf("-----------------------------------------------\n");
 
-		// printf("%d realtime processes running\n", ret);
-		/*
 		for (i = 0; i < ret; i++) {
 			printf("%d\t%d\t\%d\t%s\n", 
 			  	pinfo[i].pid, 
 			  	pinfo[i].tid, 
-			  	pinfo[i].rt_priority, 
+			  	pinfo[i].rt_priority,
 			  	pinfo[i].name
 			);
 		}
 
-		for (i = ret; i < max_seen; i++) 
+		for (i = ret; i < last_seen; i++) 
 			printf("\n");
-		*/
-		// last_seen = ret;
+		last_seen = ret;
 
 		sleep(2);
 	}
