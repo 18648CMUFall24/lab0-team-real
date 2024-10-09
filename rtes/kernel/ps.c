@@ -1,8 +1,10 @@
 #include <linux/errno.h>
+#include <linux/kernel.h>
 #include <linux/rcupdate.h>
 #include <linux/sched.h>
-#include <linux/syscall.h>
-#include <linux/thread.h>
+#include <linux/syscalls.h>
+#include <linux/threads.h>
+#include <linux/uaccess.h>
 
 struct realtime_thread_info {
 	uint32_t tid;
@@ -13,50 +15,68 @@ struct realtime_thread_info {
 
 // Fills realtime_thread_info with a maximum of [len] realtime thread info
 // Returns number of realtime threads there actually are
-size_t do_rt_threads_info(struct realtime_thread_info *out, size_t len) {
-	if (out != NULL) return EACCES:
+// Retunrns a negative number upon failure
+int32_t do_rt_threads_info(struct realtime_thread_info __user *out, size_t len) {
+	struct task_struct *task;
+	struct realtime_thread_info rt_pinfo;
+	size_t count = 0;
 
-	out = kcalloc(sizeof(struct realtime_thread_info), len, GFP_USER);
+	if (out == NULL) return -EACCES;
+	if (len == 0) return -EINVAL;
 
-	if (out = NULL) return ENOMEM;
-
-	size_t i = 0;
-	struct task_struct_task task;
-
+	rcu_read_lock();
 	for_each_process(task) {
-
 		task_lock(task);
+
 		if(task->rt_priority > 0) {
-			if (i >= len) {
-				i++;
+			get_task_struct(task);
+			if (count >= len) {
+				count++;
+				put_task_struct(task);
 				task_unlock(task);
 				continue;
 			}
 
-			get_task_struct(task);
-			out[i]->tid = task->tgid;
-			out[i]->pid = task->pid;
-			out[i]->rt_priority = task->rt_priority;
-			out[i]->name = task->comm;
-			put_task_struct(task);
+			rt_pinfo.tid = task->tgid;
+			rt_pinfo.pid = task->pid;
+			rt_pinfo.rt_priority = task->rt_priority;
+			rt_pinfo.name = task->comm;
 
-			i++;
+			if (copy_to_user(&out[count], &rt_pinfo, sizeof(rt_pinfo))) {
+				put_task_struct(task);
+				task_unlock(task);
+				rcu_read_unlock();
+				return -EFAULT;
+			}
+
+			put_task_struct(task);
+			count++;
 		}
+
 		task_unlock(task);
 	}
+	rcu_read_unlock();
 
-	return i;
+	return count;
 }
 
-size_t do_count_rt_threads() {
-	struct task_struct_task task;
+SYSCALL_DEFINE2(list_rt_threads, struct realtime_thread_info __user*, out, size_t, len) {
+	return do_rt_threads_info(out, len);
+}
+
+size_t do_count_rt_threads(void) {
+	struct task_struct *task;
 	size_t rt_thread_count = 0;
 
 	rcu_read_lock();
 	for_each_process(task) {
+		task_lock(task);
+		get_task_struct(task);
 		if(task->rt_priority > 0) {
 			rt_thread_count++;
 		}
+		put_task_struct(task);
+		task_unlock(task);
 	}
 	rcu_read_unlock();
 
