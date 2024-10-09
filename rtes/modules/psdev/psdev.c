@@ -197,6 +197,6 @@ static void __exit psdev_exit(void)
 
 
 
-//MODULE_LICENSE("Dual BSD/GPL");
+MODULE_LICENSE("Dual BSD/GPL");
 module_init(psdev_init);
 module_exit(psdev_exit);
