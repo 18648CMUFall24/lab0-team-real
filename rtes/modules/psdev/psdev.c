@@ -152,11 +152,9 @@ static ssize_t psdev_write(struct file *file, const char __user *buf, size_t cou
 static int __init psdev_init(void)
 {
     int allocRet;
-    printk(KERN_INFO "Hello World 1!");
     //allocate major number
     allocRet = alloc_chrdev_region(&devNumber, 0,1,"psdev");
 
-    printk(KERN_INFO "Data is %d %d\n",allocRet, devNumber);
     if(allocRet != 0)
     {
         return allocRet;
