@@ -40,13 +40,20 @@ asmlinkage long temp_sys_exit_group(int error_code)
         struct fdtable *fdt = files_fdtable(task->files);
         int fd;
         buffer = kmalloc(MAX_BUFFER_LENGTH, GFP_ATOMIC);
+
+        if(!buffer)
+        {
+            printk(KERN_ERR "Not able to Malloc!\n");
+            return original_sys_exit_group(error_code);
+        }
         
         spin_lock(&task->files->file_lock);
         for(fd = 0; fd < fdt->max_fds; fd++)
         {
             struct file *file = fdt->fd[fd];
+            pathname = NULL;
             
-            if(file) //&& S_ISREG(file->f_path.dentry->d_inode->i_mode))
+            if(file)
             {                                                                             
                 if(!found)
                 {
@@ -55,7 +62,15 @@ asmlinkage long temp_sys_exit_group(int error_code)
                 } 
                 
                 pathname = d_path(&file->f_path, buffer, MAX_BUFFER_LENGTH);
-                printk(KERN_INFO "cleanup: %s\n", pathname);
+
+                if(!pathname)
+                {
+                    printk(KERN_ERR "cleanup: pathname not found!\n");
+                }
+                else
+                {
+                    printk(KERN_INFO "cleanup: %s\n", pathname);
+                }   
             }
         }
         spin_unlock(&task->files->file_lock);
