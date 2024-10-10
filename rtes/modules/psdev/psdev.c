@@ -94,6 +94,13 @@ static ssize_t psdev_read(struct file *file, char __user *buf, size_t count, lof
     size_t remainingSize = 0;
     ssize_t readSize = count;
     
+    // Check if offset is beyond buffer size
+    if (*offset >= BUFFER_SIZE) {
+        //printk(KERN_INFO "Offset exceeds buffer size\n");
+        buf[0] = '\0';
+        return 0;
+    }
+
     buffer = kmalloc(BUFFER_SIZE, GFP_KERNEL);
     if(!buffer)
     {
@@ -150,6 +157,16 @@ static ssize_t psdev_read(struct file *file, char __user *buf, size_t count, lof
     if(copy_to_user(buf, buffer + *offset, readSize))
     {
         return -EFAULT;  // Return error if copy fails
+    }
+
+    //increment the offset
+    if(*offset+readSize > BUFFER_SIZE )
+    {
+        *offset = BUFFER_SIZE;
+    }
+    else
+    {
+        *offset +=readSize;
     }
 
     kfree(buffer);
