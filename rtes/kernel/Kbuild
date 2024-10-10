@@ -1,1 +1,1 @@
-obj-y += hello.o calc.o
+obj-y += hello.o calc.o ps.o
