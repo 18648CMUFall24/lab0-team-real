@@ -8,9 +8,12 @@
 #include <linux/slab.h>
 #include <linux/sched.h>
 #include <linux/rcupdate.h>  // For RCU lockin
+#include <linux/mutex.h>
 
 
 #define BUFFER_SIZE    4096
+#define DEIVCE_AMOUNT  16 
+
 //File Operation 
 static int psdev_open(struct inode *inode, struct file *file);
 static int psdev_release(struct inode *inode, struct file *file);
@@ -31,11 +34,12 @@ static ssize_t psdev_write(struct file *file, const char __user *buf, size_t cou
 
 struct psdev_device_data{
     struct cdev cdev;
+    struct mutex lock;
     int is_open;  //Flag to indicate when the device is open
 };
 
 
-static struct psdev_device_data characterDriverDevice;
+static struct psdev_device_data characterDriverDevice[DEIVCE_AMOUNT];
 
 dev_t devNumber;
 
@@ -43,26 +47,37 @@ static int psdev_open(struct inode *inode, struct file *file)
 {
     //not sure if have to malloc this device
     
-    struct psdev_device_data *device  = container_of(inode->i_cdev, struct psdev_device_data, cdev);
+    struct psdev_device_data *device;
+    int minor = iminor(inode);
 
+    device = &characterDriverDevice[minor];
+
+    mutex_lock(&device->lock);
 
     if(device->is_open)
     {
+        mutex_unlock(&device->lock);
         return -EBUSY;
     }
     
     device->is_open = 1;
     file->private_data = device;
-    printk(KERN_INFO "Device opened\n");
+
+    mutex_unlock(&device->lock);
+    printk(KERN_INFO "Device number %d opened\n", minor);
     return 0;
 
 }
 
 static int psdev_release(struct inode *inode, struct file *file)
 {
-    struct psdev_device_data *device = container_of(inode->i_cdev, struct psdev_device_data, cdev);
+    struct psdev_device_data *device = file->private_data;
+    int minor = iminor(inode);
+
+    mutex_lock(&device->lock);
     device->is_open = 0;
-    printk(KERN_INFO "Device closed\n");
+    mutex_unlock(&device->lock);
+    printk(KERN_INFO "Device number %d closed\n", minor);
     return 0;
 }
 
@@ -78,7 +93,7 @@ static ssize_t psdev_read(struct file *file, char __user *buf, size_t count, lof
     char *buffer; 
     size_t remainingSize = 0;
     ssize_t readSize = count;
-
+    
     buffer = kmalloc(BUFFER_SIZE, GFP_KERNEL);
     if(!buffer)
     {
@@ -86,6 +101,8 @@ static ssize_t psdev_read(struct file *file, char __user *buf, size_t count, lof
     }
 
     length = length + snprintf(buffer+length,BUFFER_SIZE-length, "tid\tpid\tpr\tname \n");
+
+    //printk(KERN_INFO "count is %d and Offset value: %lld\n",count, (long long)*offset);
 
     //lock to read the task list
     rcu_read_lock();
@@ -99,9 +116,9 @@ static ssize_t psdev_read(struct file *file, char __user *buf, size_t count, lof
                                     task->tgid, task->pid,task->rt_priority, task->comm);
         }
 
-        
     }
-
+    
+    //set the null character 
     if(length < BUFFER_SIZE)
     {
         buffer[length] = '\0';
@@ -135,8 +152,6 @@ static ssize_t psdev_read(struct file *file, char __user *buf, size_t count, lof
         return -EFAULT;  // Return error if copy fails
     }
 
-    //increment the offset
-    *offset +=readSize;
     kfree(buffer);
     return readSize;
 }
@@ -152,26 +167,31 @@ static ssize_t psdev_write(struct file *file, const char __user *buf, size_t cou
 static int __init psdev_init(void)
 {
     int allocRet;
+    int loop;
     //allocate major number
-    allocRet = alloc_chrdev_region(&devNumber, 0,1,"psdev");
+    allocRet = alloc_chrdev_region(&devNumber, 0,DEIVCE_AMOUNT,"psdev");
 
     if(allocRet != 0)
     {
         return allocRet;
     }
 
-    //Initialize the device
-    cdev_init(&characterDriverDevice.cdev, &psdev_fops);
-    
-    characterDriverDevice.is_open = 0;
-    
-    //Add the chacater driver
-    cdev_add(&characterDriverDevice.cdev,devNumber,1);
+    for(loop=0; loop < DEIVCE_AMOUNT; loop++)
+    {
+        //Initialize the device
+        cdev_init(&characterDriverDevice[loop].cdev, &psdev_fops);
+        
+        characterDriverDevice[loop].is_open = 0;
+
+        mutex_init(&characterDriverDevice[loop].lock);
+
+        //Add the chacater driver
+        cdev_add(&characterDriverDevice[loop].cdev,MKDEV(MAJOR(devNumber), loop),1);
 
 
-    
-    printk(KERN_INFO "Character device registered with major number %d\n", MAJOR(devNumber));
-   
+        
+        printk(KERN_INFO "Character device registered with major number %d and minor number %d\n", MAJOR(devNumber),loop);
+    }
     
     return 0;
     
@@ -179,10 +199,15 @@ static int __init psdev_init(void)
 
 static void __exit psdev_exit(void)
 {
-    cdev_del(&characterDriverDevice.cdev);
-    unregister_chrdev_region(devNumber, 1);
+    int loop;
+    for (loop = 0; loop < DEIVCE_AMOUNT; loop++)
+    {
+        cdev_del(&characterDriverDevice[loop].cdev);
+        
+    }
 
-    printk(KERN_INFO "Character device unregistered %d\n", MAJOR(devNumber));
+    unregister_chrdev_region(devNumber, DEIVCE_AMOUNT);
+    printk(KERN_INFO "Devices unregistered\n");
 }
 
 
