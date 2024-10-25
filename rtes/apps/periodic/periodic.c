@@ -45,7 +45,7 @@ int main(int argc, char *argv[]) {
 
         //set sleep time struct to go to sleep
         sleep_time.tv_sec = (tArg- cArg) / 1000;
-        sleep_time.tv_nsec = (tArg- cArg) * 1000000;
+        sleep_time.tv_nsec = ((tArg- cArg) % 1000)* 1000000;
 
         nanosleep(&sleep_time, NULL);
 
