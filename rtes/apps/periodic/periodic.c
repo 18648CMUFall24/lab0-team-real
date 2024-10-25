@@ -8,8 +8,13 @@
 #include <stdint.h>
 #include <sys/syscall.h>
 
+const uint64_t CLOCKS_PER_MSEC = (uint64_t)CLOCKS_PER_SEC / 1000;
+const uint64_t CLOCKS_PER_NSEC = (uint64_t)CLOCKS_PER_SEC / 1000000000;
+
 // Main function: entry point for execution
 int main(int argc, char *argv[]) {
+
+    uint64_t next_wakeup = clock();
     
     //check if there is the same amount of arguments
     if (argc != 4) {
@@ -21,7 +26,7 @@ int main(int argc, char *argv[]) {
     int tArg = atoi(argv[2]);
     int cpuArg = atoi(argv[3]);
     struct timespec sleep_time;
-    uint64_t clocks_per_msec = (uint64_t)CLOCKS_PER_SEC / 1000;
+    uint64_t clocks_between_periods = tArg * CLOCKS_PER_MSEC;
 
     // Setting up CPU affinity using syscall for sched_setaffinity
     unsigned long cpumask = 1UL << cpuArg;  // Set affinity to specified CPU
@@ -34,18 +39,21 @@ int main(int argc, char *argv[]) {
 
     while(1)
     {
+        next_wakeup += clocks_between_periods;
         uint64_t start = clock();
-        uint64_t totalElpasedTime = (clock() -  start ) / clocks_per_msec;
+        uint64_t totalElpasedTime = 0;
 
         //pretend to do busy work
         while(cArg >= totalElpasedTime)
         {
-            totalElpasedTime = (clock() -  start ) / clocks_per_msec;
+            totalElpasedTime = (clock() -  start ) / CLOCKS_PER_MSEC;
         }
 
         //set sleep time struct to go to sleep
-        sleep_time.tv_sec = (tArg- cArg) / 1000;
-        sleep_time.tv_nsec = ((tArg- cArg) % 1000)* 1000000;
+        uint64_t sleep_clock_cycles = next_wakeup - clock();
+
+        sleep_time.tv_sec =  sleep_clock_cycles / CLOCKS_PER_SEC;
+        sleep_time.tv_nsec = (sleep_clock_cycles % CLOCKS_PER_SEC) / CLOCKS_PER_NSEC;
 
         nanosleep(&sleep_time, NULL);
 
