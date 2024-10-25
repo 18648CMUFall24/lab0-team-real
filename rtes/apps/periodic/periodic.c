@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <sched.h>
 #include <stdint.h>
+#include <sys/syscall.h>
 
 // Main function: entry point for execution
 int main(int argc, char *argv[]) {
@@ -22,12 +23,11 @@ int main(int argc, char *argv[]) {
     struct timespec sleep_time;
     uint64_t clocks_per_msec = (double)CLOCKS_PER_SEC / 1000;
 
-    cpu_set_t cpuset;
-    CPU_ZERO(&cpuset);
-    CPU_SET(cpuArg, &cpuset);
+    // Setting up CPU affinity using syscall for sched_setaffinity
+    unsigned long cpumask = 1UL << cpuArg;  // Set affinity to specified CPU
 
-    if (sched_setaffinity(0, sizeof(cpu_set_t), &cpuset) == -1) {
-        perror("sched_setaffinity");
+    if (syscall(__NR_sched_setaffinity, 0, sizeof(cpumask), &cpumask) == -1) {
+        perror("sched_setaffinity syscall");
         return -1;
     }
 
