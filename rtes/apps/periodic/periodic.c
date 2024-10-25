@@ -21,7 +21,7 @@ int main(int argc, char *argv[]) {
     int tArg = atoi(argv[2]);
     int cpuArg = atoi(argv[3]);
     struct timespec sleep_time;
-    uint64_t clocks_per_msec = (double)CLOCKS_PER_SEC / 1000;
+    uint64_t clocks_per_msec = (uint64_t)CLOCKS_PER_SEC / 1000;
 
     // Setting up CPU affinity using syscall for sched_setaffinity
     unsigned long cpumask = 1UL << cpuArg;  // Set affinity to specified CPU
