@@ -64,5 +64,34 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 
 SYSCALL_DEFINE1(cancel_reserve, pid_t, tid) 
 {
-	return 1;
+	struct threadNode *loopedThread = threadHead;
+    struct threadNode *prev = NULL;
+
+    // If tid is 0, use current thread's pid
+    if (tid == 0) {
+        tid = current->pid;
+    }
+
+	while(loopedThread != NULL)
+	{
+		if(loopedThread->tid == tid)
+		{
+			//remove from linked List
+			if(prev != NULL)
+			{	
+				prev->next = loopedThread->next;
+			}
+			else
+			{
+				threadHead = loopedThread->next;
+			}
+			kfree(loopedThread);
+			return 0;
+		}
+
+		prev = loopedThread;
+		loopedThread = loopedThread->next;
+	}
+
+	return -1;
 }
