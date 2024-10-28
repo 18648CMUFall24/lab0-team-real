@@ -3,6 +3,7 @@
 #include <linux/syscalls.h>
 #include <linux/uaccess.h>
 #include <linux/slab.h>
+#include <time.h>
 
 
 struct threadNode* threadHead = NULL;
