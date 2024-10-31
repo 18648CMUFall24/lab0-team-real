@@ -72,6 +72,7 @@
 #include <linux/ftrace.h>
 #include <linux/slab.h>
 #include <linux/cpuacct.h>
+#include <linux/rtes_framework.h>
 
 #include <asm/tlb.h>
 #include <asm/irq_regs.h>
@@ -4250,9 +4251,29 @@ pick_next_task(struct rq *rq)
 		p = class->pick_next_task(rq);
 		if (p)
 			return p;
-	}
+	};
 
 	BUG(); /* the idle class will always have a runnable task */
+}
+
+void rtes_schedule(struct task_struct *task) {
+	struct threadNode *threadStruct;
+	pid_t tid = task->pid;
+
+	lockScheduleLL();
+	threadStruct = findThreadInScheduleLL(tid);
+	rtesScheduleTask(threadStruct);
+	unlockScheduleLL();
+}
+
+void rtes_deschedule(struct task_struct *task) {
+	struct threadNode *threadStruct;
+	pid_t tid = task->pid;
+
+	lockScheduleLL();
+	threadStruct = findThreadInScheduleLL(tid);
+	rtesDescheduleTask(threadStruct);
+	unlockScheduleLL();
 }
 
 /*
@@ -4284,6 +4305,7 @@ need_resched:
 		if (unlikely(signal_pending_state(prev->state, prev))) {
 			prev->state = TASK_RUNNING;
 		} else {
+			rtes_deschedule(prev);
 			deactivate_task(rq, prev, DEQUEUE_SLEEP);
 			prev->on_rq = 0;
 
@@ -4310,6 +4332,7 @@ need_resched:
 
 	put_prev_task(rq, prev);
 	next = pick_next_task(rq);
+	rtes_schedule(next);
 	clear_tsk_need_resched(prev);
 	rq->skip_clock_update = 0;
 

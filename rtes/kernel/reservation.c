@@ -17,6 +17,7 @@ static bool head_was_init = false;
 
 //int amountReserved;
 
+
 void threadHead_init(void) {
 	threadHead.head = NULL;
 	spin_lock_init(&threadHead.mutex);
@@ -51,7 +52,7 @@ void rtesDescheduleTask(struct threadNode *task) {
 	*/
 }
 
-void  rtesScheduleTask(struct threadNode *task) {
+void rtesScheduleTask(struct threadNode *task) {
 	task->prev_schedule = hrtimer_get_remaining(&task->high_res_timer);
 }
 
@@ -64,10 +65,8 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 	struct threadNode *lookThread = NULL;
 
 	if(cpuid < 0 && cpuid > 3) {
-
 		printk(KERN_INFO "CPU ID does not exist!\n");
 		return EINVAL;
-		
 	}
 
 	if (!head_was_init) {
@@ -80,8 +79,8 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 
 	if (!access_ok(VERIFY_READ, C, sizeof(struct timespec)) || !access_ok(VERIFY_READ, T, sizeof(struct timespec))) 
 	{
-    	printk(KERN_INFO "Invalid user space pointers!\n");
-    	return -EFAULT;
+		printk(KERN_INFO "Invalid user space pointers!\n");
+		return -EFAULT;
 	}
 
 	// Copy from user space
@@ -90,11 +89,12 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 		printk(KERN_INFO "Error in copying C!\n");
 		return -EFAULT;
 	}
-	
+
 	if(copy_from_user(&t, T, sizeof(struct timespec))) {
 		printk(KERN_INFO "Error in copying T!\n");
 		return -EFAULT;
 	}
+
 
 	// Setting up CPU affinity using syscall for sched_setaffinity
 	cpumask_clear(&cpumask);
@@ -122,10 +122,12 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 		lookThread->cost_us = ktime_to_us(timespec_to_ktime(c));
 		lookThread->periodTime = 0;
 
+		hrtimer_init(&new_node->high_res_timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
+		new_node->high_res_timer.function = &restart_period;
 		printk(KERN_INFO "Updated existing thread!\n");
 	}
 	else
-	{
+{
 		new_node = kmalloc(sizeof(struct threadNode), GFP_KERNEL);
 		if(!new_node) {
 			printk(KERN_INFO "Error in malloc!\n");
@@ -142,7 +144,7 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 		new_node->periodTime = 0;
 		hrtimer_init(&new_node->high_res_timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
 		new_node->high_res_timer.function = &restart_period;
-		
+
 		//setting the thread head and its next
 		new_node->next = threadHead.head;
 		threadHead.head = new_node; // Insert into linked list
@@ -258,7 +260,6 @@ SYSCALL_DEFINE1(cancel_reserve, pid_t, tid)
 	//}
 	unlockScheduleLL();
 
-	
 	return output;
 }
 
