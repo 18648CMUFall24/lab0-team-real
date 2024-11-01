@@ -1,3 +1,4 @@
+#include <linux/kernel.h>
 #include <linux/rtes_framework.h>
 #include <linux/errno.h>
 #include <linux/syscalls.h>
@@ -5,6 +6,8 @@
 #include <linux/slab.h>
 #include <linux/time.h>
 #include <linux/spinlock.h>
+#include <asm/signal.h>
+#include <asm/siginfo.h>
 
 
 struct rtesThreadHead {
@@ -41,29 +44,51 @@ static enum hrtimer_restart restart_period(struct hrtimer *timer) {
 	return HRTIMER_RESTART;
 }
 
-void rtesDescheduleTask(struct threadNode *task) {
+void rtesDescheduleTask(struct task_struct *task) {
+	struct threadNode *task_node;
 	ktime_t rem, delta;
-	siginfo info;
+	siginfo_t info;
+
 	if (task == NULL) return;
 
-	rem = hrtimer_get_remaining(&task->high_res_timer);
-	delta = ktime_sub(task->prev_schedule, rem);
-	task->periodTime += ktime_to_us(delta);
-	if (task->periodTime > task->cost_us) {
+	lockScheduleLL();
+	task_node = findThreadInScheduleLL(task);
+	if (task_node == NULL) {
+		unlockScheduleLL();
+		return;
+	}
+
+	rem = hrtimer_get_remaining(&task_node->high_res_timer);
+	delta = ktime_sub(task_node->prev_schedule, rem);
+	task_node->periodTime += ktime_to_us(delta);
+	if (task_node->periodTime > task_node->cost_us) {
+		memset(&info, 0, sizeof(siginfo_t));
 		info.si_signo = SIGEXCESS;
 		info.si_code = SI_KERNEL;
-		info.sigint = SIGEXCESS;
-		if (send_sig_info(SIGEXCESS, &info, task->tid) < 0) {
-			printk(KERN_WARNING "Failed to send SIGEXCESS to thread %d", task->tid);
+		info.si_int = SIGEXCESS;
+		if (send_sig_info(SIGEXCESS, &info, task) < 0) {
+			printk(KERN_WARNING "Failed to send SIGEXCESS to thread %d", task_node->tid);
 		}
 		
-		printk(KERN_ERR "Thread %d exceeded reserved time utilization", task->tid);
+		printk(KERN_ERR "Thread %d exceeded reserved time utilization", task_node->tid);
 	}
+	unlockScheduleLL();
 }
 
-void rtesScheduleTask(struct threadNode *task) {
+void rtesScheduleTask(struct task_struct *task) {
+	struct threadNode *task_node;
+
 	if (task == NULL) return;
-	task->prev_schedule = hrtimer_get_remaining(&task->high_res_timer);
+
+	lockScheduleLL();
+	task_node = findThreadInScheduleLL(task);
+	if (task_node == NULL) {
+		unlockScheduleLL();
+		return;
+	}
+
+	task_node->prev_schedule = hrtimer_get_remaining(&task_node->high_res_timer);
+	unlockScheduleLL();
 }
 
 
@@ -275,8 +300,12 @@ SYSCALL_DEFINE1(cancel_reserve, pid_t, tid)
 
 
 // Requires locking struct
-struct threadNode *findThreadInScheduleLL(pid_t tid){
-	struct threadNode *loopedThread = threadHead.head;
+struct threadNode *findThreadInScheduleLL(struct task_struct *task){
+	struct threadNode *loopedThread;
+	pid_t tid;
+
+	loopedThread = threadHead.head;
+	tid = task->pid;
 
 	while(loopedThread != NULL) {
 		if (loopedThread->tid == tid) {
