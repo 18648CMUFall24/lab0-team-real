@@ -83,6 +83,7 @@ int main(int argc, char *argv[]) {
         clock_t clocks_periodElapsedTime = 0;
 
         printf("Started period...");
+        fflush(stdout);
 
         //pretend to do busy work
         while(clocks_running >= clocks_periodElapsedTime)
