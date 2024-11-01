@@ -3,10 +3,11 @@
 #include <linux/syscalls.h>
 #include <linux/uaccess.h>
 #include <linux/slab.h>
-#include <time.h>
+#include <linux/time.h>
 
 
 struct threadNode* threadHead = NULL;
+int globalAmount; 
 
 SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*, T , int, cpuid) 
 {
@@ -58,8 +59,8 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 	new_node->next = threadHead;
     threadHead = new_node; // Insert into linked list
 
-
-
+	globalAmount++;
+	
 	return 0;
 }
 
