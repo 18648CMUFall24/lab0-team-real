@@ -26,9 +26,9 @@ struct threadNode {
 
 void lockScheduleLL(void);
 void unlockScheduleLL(void);
-void rtesScheduleTask(struct threadNode *task);
-void rtesDescheduleTask(struct threadNode *task);
-struct threadNode *findThreadInScheduleLL(pid_t tid);
+void rtesScheduleTask(struct task_struct *task);
+void rtesDescheduleTask(struct task_struct *task);
+struct threadNode *findThreadInScheduleLL(struct task_struct *task);
 int removeThreadInScheduleLL(pid_t tid);
 
 #endif /* _RTES_FRAMEWORK_H */

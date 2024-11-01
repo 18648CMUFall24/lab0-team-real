@@ -4256,26 +4256,6 @@ pick_next_task(struct rq *rq)
 	BUG(); /* the idle class will always have a runnable task */
 }
 
-void rtes_schedule(struct task_struct *task) {
-	struct threadNode *threadStruct;
-	pid_t tid = task->pid;
-
-	lockScheduleLL();
-	threadStruct = findThreadInScheduleLL(tid);
-	rtesScheduleTask(threadStruct);
-	unlockScheduleLL();
-}
-
-void rtes_deschedule(struct task_struct *task) {
-	struct threadNode *threadStruct;
-	pid_t tid = task->pid;
-
-	lockScheduleLL();
-	threadStruct = findThreadInScheduleLL(tid);
-	rtesDescheduleTask(threadStruct);
-	unlockScheduleLL();
-}
-
 /*
  * __schedule() is the main scheduler function.
  */
@@ -4339,9 +4319,9 @@ need_resched:
 		rq->curr = next;
 		++*switch_count;
 
-		rtes_deschedule(prev);
+		rtesDescheduleTask(prev);
 		context_switch(rq, prev, next); /* unlocks the rq */
-		rtes_schedule(next);
+		rtesScheduleTask(next);
 		/*
 		 * The context switch have flipped the stack from under us
 		 * and restored the local variables which were saved when
