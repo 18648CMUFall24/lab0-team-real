@@ -36,7 +36,7 @@ int main(int argc, char *argv[])
         struct timespec C = { .tv_sec = atoi(argv[4]) / 1000, .tv_nsec = ((atoi(argv[4])%1000) *1000000)};
         int cpu = atoi(argv[5]);
 
-        returnSys = syscall(__NR_set_reserve,threadID,T,C,cpu);
+        returnSys = syscall(__NR_set_reserve,threadID,&T,&C,cpu);
         if(returnSys < 0)
         {
             printf("Error in syscall!\n");
