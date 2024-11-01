@@ -4305,7 +4305,6 @@ need_resched:
 		if (unlikely(signal_pending_state(prev->state, prev))) {
 			prev->state = TASK_RUNNING;
 		} else {
-			rtes_deschedule(prev);
 			deactivate_task(rq, prev, DEQUEUE_SLEEP);
 			prev->on_rq = 0;
 
@@ -4332,7 +4331,6 @@ need_resched:
 
 	put_prev_task(rq, prev);
 	next = pick_next_task(rq);
-	rtes_schedule(next);
 	clear_tsk_need_resched(prev);
 	rq->skip_clock_update = 0;
 
@@ -4341,7 +4339,9 @@ need_resched:
 		rq->curr = next;
 		++*switch_count;
 
+		rtes_deschedule(prev);
 		context_switch(rq, prev, next); /* unlocks the rq */
+		rtes_schedule(next);
 		/*
 		 * The context switch have flipped the stack from under us
 		 * and restored the local variables which were saved when

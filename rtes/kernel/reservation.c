@@ -42,8 +42,11 @@ static enum hrtimer_restart restart_period(struct hrtimer *timer) {
 }
 
 void rtesDescheduleTask(struct threadNode *task) {
-	ktime_t rem = hrtimer_get_remaining(&task->high_res_timer);
-	ktime_t delta = ktime_sub(task->prev_schedule, rem);
+	ktime_t rem, delta;
+	if (task == NULL) return;
+
+	rem = hrtimer_get_remaining(&task->high_res_timer);
+	delta = ktime_sub(task->prev_schedule, rem);
 	task->periodTime += ktime_to_us(delta);
 	/*
 	if (task->periodTime > task->cost_us) {
@@ -53,6 +56,7 @@ void rtesDescheduleTask(struct threadNode *task) {
 }
 
 void rtesScheduleTask(struct threadNode *task) {
+	if (task == NULL) return;
 	task->prev_schedule = hrtimer_get_remaining(&task->high_res_timer);
 }
 
