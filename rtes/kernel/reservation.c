@@ -43,16 +43,22 @@ static enum hrtimer_restart restart_period(struct hrtimer *timer) {
 
 void rtesDescheduleTask(struct threadNode *task) {
 	ktime_t rem, delta;
+	siginfo info;
 	if (task == NULL) return;
 
 	rem = hrtimer_get_remaining(&task->high_res_timer);
 	delta = ktime_sub(task->prev_schedule, rem);
 	task->periodTime += ktime_to_us(delta);
-	/*
 	if (task->periodTime > task->cost_us) {
-		kill(task->pid, SIGEXCESS);
+		info.si_signo = SIGEXCESS;
+		info.si_code = SI_KERNEL;
+		info.sigint = SIGEXCESS;
+		if (send_sig_info(SIGEXCESS, &info, task->tid) < 0) {
+			printk(KERN_WARNING "Failed to send SIGEXCESS to thread %d", task->tid);
+		}
+		
+		printk(KERN_ERR "Thread %d exceeded reserved time utilization", task->tid);
 	}
-	*/
 }
 
 void rtesScheduleTask(struct threadNode *task) {
