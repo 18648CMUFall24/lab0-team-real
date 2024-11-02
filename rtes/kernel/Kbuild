@@ -1,1 +1,1 @@
-obj-y += hello.o calc.o ps.o
+obj-y += hello.o calc.o ps.o reservation.o

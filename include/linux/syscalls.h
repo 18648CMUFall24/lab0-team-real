@@ -64,6 +64,7 @@ struct old_linux_dirent;
 struct perf_event_attr;
 struct file_handle;
 struct realtime_thread_info;
+struct timespec;
 
 #include <linux/types.h>
 #include <linux/aio_abi.h>
@@ -854,5 +855,7 @@ asmlinkage long sys_calc(const char* param1,
 
 asmlinkage long sys_count_rt_threads(void);
 asmlinkage long sys_list_rt_threads(struct realtime_thread_info *out, size_t len);
+asmlinkage long sys_set_reserve(pid_t tid, struct timespec *C, struct timespec *T, int cpuid);
+asmlinkage long sys_cancel_reserve(pid_t tid);
 
 #endif
