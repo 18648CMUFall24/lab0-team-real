@@ -18,14 +18,14 @@ struct rtesThreadHead {
 static struct rtesThreadHead threadHead;
 static bool head_was_init = false;
 
-//int amountReserved;
+static size_t amountReserved;
 
 
 void threadHead_init(void) {
 	threadHead.head = NULL;
 	spin_lock_init(&threadHead.mutex);
 	head_was_init = true;
-	//amountReserved = 0;
+	amountReserved = 0;
 }
 
 void lockScheduleLL() {
@@ -52,7 +52,7 @@ void rtesDescheduleTask(struct task_struct *task) {
 	if (task == NULL) return;
 
 	lockScheduleLL();
-	task_node = findThreadInScheduleLL(task);
+	task_node = findThreadInScheduleLL(task->pid);
 	if (task_node == NULL) {
 		unlockScheduleLL();
 		return;
@@ -69,7 +69,7 @@ void rtesDescheduleTask(struct task_struct *task) {
 		if (send_sig_info(SIGEXCESS, &info, task) < 0) {
 			printk(KERN_WARNING "Failed to send SIGEXCESS to thread %d", task_node->tid);
 		}
-		
+
 		printk(KERN_ERR "Thread %d exceeded reserved time utilization", task_node->tid);
 	}
 	unlockScheduleLL();
@@ -81,7 +81,7 @@ void rtesScheduleTask(struct task_struct *task) {
 	if (task == NULL) return;
 
 	lockScheduleLL();
-	task_node = findThreadInScheduleLL(task);
+	task_node = findThreadInScheduleLL(task->pid);
 	if (task_node == NULL) {
 		unlockScheduleLL();
 		return;
@@ -99,7 +99,7 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 	struct cpumask cpumask;
 	struct threadNode *lookThread = NULL;
 
-	if(cpuid < 0 && cpuid > 3) {
+	if(cpuid < 0 || cpuid > 3) {
 		printk(KERN_INFO "CPU ID does not exist!\n");
 		return EINVAL;
 	}
@@ -112,15 +112,13 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 		tid = current->pid;
 	}
 
-	if (!access_ok(VERIFY_READ, C, sizeof(struct timespec)) || !access_ok(VERIFY_READ, T, sizeof(struct timespec))) 
-	{
+	if (!access_ok(VERIFY_READ, C, sizeof(struct timespec)) || !access_ok(VERIFY_READ, T, sizeof(struct timespec))) {
 		printk(KERN_INFO "Invalid user space pointers!\n");
 		return -EFAULT;
 	}
 
 	// Copy from user space
-	if (copy_from_user(&c, C, sizeof(struct timespec)))
-	{
+	if (copy_from_user(&c, C, sizeof(struct timespec))) {
 		printk(KERN_INFO "Error in copying C!\n");
 		return -EFAULT;
 	}
@@ -147,8 +145,7 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 	lookThread = findThreadInScheduleLL(tid);
 
 
-	if(lookThread != NULL)
-	{
+	if(lookThread != NULL) {
 		lookThread->C = c;
 		lookThread->T = t;
 		lookThread->tid = tid;
@@ -156,14 +153,10 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 		lookThread->periodDuration = timespec_to_ktime(t);
 		lookThread->cost_us = ktime_to_us(timespec_to_ktime(c));
 		lookThread->periodTime = 0;
-		hrtimer_start(&new_node->high_res_timer, new_node->periodDuration, HRTIMER_MODE_ABS);
+		hrtimer_start(&lookThread->high_res_timer, lookThread->periodDuration, HRTIMER_MODE_ABS);
 
-		hrtimer_init(&new_node->high_res_timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
-		new_node->high_res_timer.function = &restart_period;
 		printk(KERN_INFO "Updated existing thread!\n");
-	}
-	else
-{
+	} else {
 		new_node = kmalloc(sizeof(struct threadNode), GFP_KERNEL);
 		if(!new_node) {
 			printk(KERN_INFO "Error in malloc!\n");
@@ -185,50 +178,9 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 		//setting the thread head and its next
 		new_node->next = threadHead.head;
 		threadHead.head = new_node; // Insert into linked list
-		//amountReserved++;
+		amountReserved++;
 	}
 
-	// if(amountReserved >= 1)
-	// {
-	// 	struct threadNode *loopedThread = threadHead.head;
-	// 	printk(KERN_INFO "amount reserved is %d\n", amountReserved);
-	// 	printk(KERN_INFO "Thread ID: %lld, CPU ID: %lld, Period Duration: %llu, Cost: %llu\n",
-    //    			(long long)loopedThread->tid,
-    //    			(long long)loopedThread->cpuid,
-    //    			(unsigned long long)ktime_to_us(loopedThread->periodDuration),
-    //    			(unsigned long long)loopedThread->cost_us);
-
-	// }
-	// if(amountReserved >= 2)
-	// {
-	// 	struct threadNode *loopedThread = threadHead.head->next;
-	// 	printk(KERN_INFO "amount reserved is %d\n", amountReserved);
-	// 	printk(KERN_INFO "Thread ID: %lld, CPU ID: %lld, Period Duration: %llu, Cost: %llu\n",
-    //    			(long long)loopedThread->tid,
-    //    			(long long)loopedThread->cpuid,
-    //    			(unsigned long long)ktime_to_us(loopedThread->periodDuration),
-    //    			(unsigned long long)loopedThread->cost_us);
-	// }
-	// if(amountReserved >= 3)
-	// {
-	// 	struct threadNode *loopedThread = threadHead.head->next->next;
-	// 	printk(KERN_INFO "amount reserved is %d\n", amountReserved);
-	// 	printk(KERN_INFO "Thread ID: %lld, CPU ID: %lld, Period Duration: %llu, Cost: %llu\n",
-    //    			(long long)loopedThread->tid,
-    //    			(long long)loopedThread->cpuid,
-    //    			(unsigned long long)ktime_to_us(loopedThread->periodDuration),
-    //    			(unsigned long long)loopedThread->cost_us);
-	// }
-	// if(amountReserved >= 4)
-	// {
-	// 	struct threadNode *loopedThread = threadHead.head->next->next->next;
-	// 	printk(KERN_INFO "amount reserved is %d\n", amountReserved);
-	// 	printk(KERN_INFO "Thread ID: %lld, CPU ID: %lld, Period Duration: %llu, Cost: %llu\n",
-    //    			(long long)loopedThread->tid,
-    //    			(long long)loopedThread->cpuid,
-    //    			(unsigned long long)ktime_to_us(loopedThread->periodDuration),
-    //    			(unsigned long long)loopedThread->cost_us);
-	// }
 	unlockScheduleLL();
 
 	return 0;
@@ -245,56 +197,8 @@ SYSCALL_DEFINE1(cancel_reserve, pid_t, tid)
 
 	lockScheduleLL();
 	output = removeThreadInScheduleLL(tid);
-	//amountReserved--;
+	amountReserved--;
 
-	// if(amountReserved == 0)
-	// {
-	// 	printk(KERN_INFO "Empty Linked List!\n");
-	// }
-	// else
-	// {
-	// 	if(amountReserved >= 1)
-	// 	{
-	// 		struct threadNode *loopedThread = threadHead.head;
-	// 		printk(KERN_INFO "amount reserved is %d\n", amountReserved);
-	// 		printk(KERN_INFO "Thread ID: %lld, CPU ID: %lld, Period Duration: %llu, Cost: %llu\n",
-	// 				(long long)loopedThread->tid,
-	// 				(long long)loopedThread->cpuid,
-	// 				(unsigned long long)ktime_to_us(loopedThread->periodDuration),
-	// 				(unsigned long long)loopedThread->cost_us);
-
-	// 	}
-	// 	if(amountReserved >= 2)
-	// 	{
-	// 		struct threadNode *loopedThread = threadHead.head->next;
-	// 		printk(KERN_INFO "amount reserved is %d", amountReserved);
-	// 		printk(KERN_INFO "Thread ID: %lld, CPU ID: %lld, Period Duration: %llu, Cost: %llu\n",
-	// 				(long long)loopedThread->tid,
-	// 				(long long)loopedThread->cpuid,
-	// 				(unsigned long long)ktime_to_us(loopedThread->periodDuration),
-	// 				(unsigned long long)loopedThread->cost_us);
-	// 	}
-	// 	if(amountReserved >= 3)
-	// 	{
-	// 		struct threadNode *loopedThread = threadHead.head->next->next;
-	// 		printk(KERN_INFO "amount reserved is %d\n", amountReserved);
-	// 		printk(KERN_INFO "Thread ID: %lld, CPU ID: %lld, Period Duration: %llu, Cost: %llu\n",
-	// 				(long long)loopedThread->tid,
-	// 				(long long)loopedThread->cpuid,
-	// 				(unsigned long long)ktime_to_us(loopedThread->periodDuration),
-	// 				(unsigned long long)loopedThread->cost_us);
-	// 	}
-	// 	if(amountReserved >= 4)
-	// 	{
-	// 		struct threadNode *loopedThread = threadHead.head->next->next->next;
-	// 		printk(KERN_INFO "amount reserved is %d\n", amountReserved);
-	// 		printk(KERN_INFO "Thread ID: %lld, CPU ID: %lld, Period Duration: %llu, Cost: %llu\n",
-	// 				(long long)loopedThread->tid,
-	// 				(long long)loopedThread->cpuid,
-	// 				(unsigned long long)ktime_to_us(loopedThread->periodDuration),
-	// 				(unsigned long long)loopedThread->cost_us);
-	// 	}
-	//}
 	unlockScheduleLL();
 
 	return output;
@@ -302,12 +206,10 @@ SYSCALL_DEFINE1(cancel_reserve, pid_t, tid)
 
 
 // Requires locking struct
-struct threadNode *findThreadInScheduleLL(struct task_struct *task){
+struct threadNode *findThreadInScheduleLL(pid_t tid){
 	struct threadNode *loopedThread;
-	pid_t tid;
 
 	loopedThread = threadHead.head;
-	tid = task->pid;
 
 	while(loopedThread != NULL) {
 		if (loopedThread->tid == tid) {
@@ -345,3 +247,45 @@ int removeThreadInScheduleLL(pid_t tid) {
 
 	return -1;
 }
+
+void debugPrints(){
+	if(amountReserved == 0) {
+		printk(KERN_INFO "Empty Linked List!\n");
+	} else {
+		if(amountReserved >= 1) {
+			struct threadNode *loopedThread = threadHead.head;
+			printk(KERN_INFO "amount reserved is %d\n", amountReserved);
+			printk(KERN_INFO "Thread ID: %lld, CPU ID: %lld, Period Duration: %llu, Cost: %llu\n",
+	  (long long)loopedThread->tid,
+	  (long long)loopedThread->cpuid,
+	  (unsigned long long)ktime_to_us(loopedThread->periodDuration),
+	  (unsigned long long)loopedThread->cost_us);
+
+		} if(amountReserved >= 2) {
+			struct threadNode *loopedThread = threadHead.head->next;
+			printk(KERN_INFO "amount reserved is %d", amountReserved);
+			printk(KERN_INFO "Thread ID: %lld, CPU ID: %lld, Period Duration: %llu, Cost: %llu\n",
+	  (long long)loopedThread->tid,
+	  (long long)loopedThread->cpuid,
+	  (unsigned long long)ktime_to_us(loopedThread->periodDuration),
+	  (unsigned long long)loopedThread->cost_us);
+		} if(amountReserved >= 3) {
+			struct threadNode *loopedThread = threadHead.head->next->next;
+			printk(KERN_INFO "amount reserved is %d\n", amountReserved);
+			printk(KERN_INFO "Thread ID: %lld, CPU ID: %lld, Period Duration: %llu, Cost: %llu\n",
+	  (long long)loopedThread->tid,
+	  (long long)loopedThread->cpuid,
+	  (unsigned long long)ktime_to_us(loopedThread->periodDuration),
+	  (unsigned long long)loopedThread->cost_us);
+		} if(amountReserved >= 4) {
+			struct threadNode *loopedThread = threadHead.head->next->next->next;
+			printk(KERN_INFO "amount reserved is %d\n", amountReserved);
+			printk(KERN_INFO "Thread ID: %lld, CPU ID: %lld, Period Duration: %llu, Cost: %llu\n",
+	  (long long)loopedThread->tid,
+	  (long long)loopedThread->cpuid,
+	  (unsigned long long)ktime_to_us(loopedThread->periodDuration),
+	  (unsigned long long)loopedThread->cost_us);
+		}
+	}
+}
+
