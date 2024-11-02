@@ -156,6 +156,7 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 		lookThread->periodDuration = timespec_to_ktime(t);
 		lookThread->cost_us = ktime_to_us(timespec_to_ktime(c));
 		lookThread->periodTime = 0;
+		hrtimer_start(&new_node->high_res_timer, new_node->periodDuration, HRTIMER_MODE_ABS);
 
 		hrtimer_init(&new_node->high_res_timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
 		new_node->high_res_timer.function = &restart_period;
@@ -179,6 +180,7 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 		new_node->periodTime = 0;
 		hrtimer_init(&new_node->high_res_timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
 		new_node->high_res_timer.function = &restart_period;
+		hrtimer_start(&new_node->high_res_timer, new_node->periodDuration, HRTIMER_MODE_ABS);
 
 		//setting the thread head and its next
 		new_node->next = threadHead.head;
