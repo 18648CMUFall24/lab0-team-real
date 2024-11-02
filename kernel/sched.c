@@ -4251,7 +4251,7 @@ pick_next_task(struct rq *rq)
 		p = class->pick_next_task(rq);
 		if (p)
 			return p;
-	};
+	}
 
 	BUG(); /* the idle class will always have a runnable task */
 }
