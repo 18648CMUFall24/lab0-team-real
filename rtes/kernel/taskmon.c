@@ -4,6 +4,8 @@
 #include <linux/kernel.h>
 #include <linux/mutex.h>
 #include <linux/rtes_framework.h>
+#include <linux/hrtimer.h>
+
 
 
 static struct kobject *taskmon_kobj;
@@ -12,7 +14,58 @@ static DEFINE_MUTEX(monitoring_lock);
 
 static struct kobject *rtes_kobject;
 static struct kobject *taskmon_kobject;
+static struct kobject *util_kobject;
 
+
+
+// Function to show utilization for task per data point
+static ssize_t util_file_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf) 
+{
+
+    return 0;
+}
+
+
+// Define sysfs attribute for utilization
+static struct kobj_attribute utilization_attribute = __ATTR(utilization, 0664, util_file_show, NULL);
+
+
+
+int createThreadFile(pid_t tid, struct kobject *thread_obj)
+{
+    int error = 0;
+    char tid_name[16];
+
+    // Create a name for the kobject using the tid
+    snprintf(tid_name, sizeof(tid_name), "%d", tid);
+
+    //Create a kobject for the thread under util directory
+    thread_obj = kobject_create_and_add(tid_name, util_kobject);
+    if (!thread_obj) {
+        return -ENOMEM;
+    }
+
+
+    // Add the utilization file to the thread's kobject
+    error = sysfs_create_file(thread_obj, &utilization_attribute.attr);
+    if (error) {
+        kobject_put(thread_obj); // Clean up on failure
+        return -1;
+    }
+
+
+    return 0;
+}
+
+int removeThreadFile(pid_t tid, struct kobject *thread_obj)
+{
+    // Remove the sysfs file associated with the kobject
+    sysfs_remove_file(thread_obj, &utilization_attribute.attr);
+    // Remove the kobject
+    kobject_put(thread_obj);
+    
+    return 0;
+}
 
 
 // Reading 'enabled' attribute - shows if monitoring is active or not
@@ -55,7 +108,7 @@ static int __init taskmon_init(void) {
 
     int error = 0;
 
-    //creating rtes directory
+    //creating rtes directory in the sys directory
     rtes_kobject = kobject_create_and_add("rtes", NULL);
     if(!rtes_kobject)
     {
@@ -70,6 +123,14 @@ static int __init taskmon_init(void) {
         return -ENOMEM;
     }
 
+    //create utilization file in the directory
+    util_kobject = kobject_create_and_add("util", taskmon_kobject);
+    if(!util_kobject)
+    {
+        kobject_put(taskmon_kobject);
+        kobject_put(rtes_kobject);
+        return -ENOMEM;
+    }
 
     //creating the file
     error = sysfs_create_file(taskmon_kobject, &monitoring_control_attr.attr);

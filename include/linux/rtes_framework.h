@@ -7,6 +7,7 @@
 #include <linux/types.h>
 #include <linux/sched.h>
 #include <linux/hrtimer.h>
+#include <linux/kobject.h>
 
 
 // Define the structure for linked list nodes
@@ -21,6 +22,8 @@ struct threadNode {
     ktime_t prev_schedule;	// Period time remaining at start of running
     struct hrtimer high_res_timer;	// High-res timer
     struct threadNode* next;	// Pointer to the next node
+    struct kobject *thread_obj; // Pointer to the kObject for the file
+
 };
 
 
@@ -30,5 +33,8 @@ void rtesScheduleTask(struct threadNode *task);
 void rtesDescheduleTask(struct threadNode *task);
 struct threadNode *findThreadInScheduleLL(pid_t tid);
 int removeThreadInScheduleLL(pid_t tid);
+int createThreadFile(pid_t tid, struct kobject *thread_obj);
+int removeThreadFile(pid_t tid, struct kobject *thread_obj);
+
 
 #endif /* _RTES_FRAMEWORK_H */

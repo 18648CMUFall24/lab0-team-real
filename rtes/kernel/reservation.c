@@ -143,9 +143,13 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 		hrtimer_init(&new_node->high_res_timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
 		new_node->high_res_timer.function = &restart_period;
 		
+		//Creating thread utilziation file
+		createThreadFile(tid, new_node->thread_obj);
+
 		//setting the thread head and its next
 		new_node->next = threadHead.head;
 		threadHead.head = new_node; // Insert into linked list
+
 		//amountReserved++;
 	}
 
@@ -278,6 +282,7 @@ struct threadNode *findThreadInScheduleLL(pid_t tid){
 	return loopedThread;
 }
 
+
 // Requires locking
 int removeThreadInScheduleLL(pid_t tid) {
 	struct threadNode *loopedThread = threadHead.head;
@@ -285,6 +290,9 @@ int removeThreadInScheduleLL(pid_t tid) {
 
 	while(loopedThread != NULL) {
 		if(loopedThread->tid == tid) {
+
+			//remove the thread file utilization 
+			removeThreadFile(tid, loopedThread->thread_obj);
 			//remove from linked List
 			if(prev != NULL) {	
 				prev->next = loopedThread->next;
