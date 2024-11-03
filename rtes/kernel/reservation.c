@@ -45,7 +45,7 @@ static enum hrtimer_restart restart_period(struct hrtimer *timer) {
 }
 
 void rtesDescheduleTask(struct task_struct *task) {
-	struct threadNode *task_node;
+	struct threadNode *task_node = NULL;
 	ktime_t rem, delta;
 	siginfo_t info;
 

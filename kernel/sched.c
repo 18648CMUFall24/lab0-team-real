@@ -4319,8 +4319,9 @@ need_resched:
 		rq->curr = next;
 		++*switch_count;
 
-		rtesDescheduleTask(prev);
+		
 		context_switch(rq, prev, next); /* unlocks the rq */
+		rtesDescheduleTask(prev);
 		rtesScheduleTask(next);
 		/*
 		 * The context switch have flipped the stack from under us
