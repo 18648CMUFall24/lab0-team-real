@@ -21,7 +21,7 @@ struct threadNode {
     u64 periodTime;	// Accumulator for period time (us)
     ktime_t prev_schedule;	// Period time remaining at start of running
     struct hrtimer high_res_timer;	// High-res timer
-    struct kobject *thread_obj; // Pointer to the kObject for the file
+    struct kobj_attribute *thread_obj; // Pointer to the kObject for the file
     struct threadNode* next;	// Pointer to the next node
 };
 

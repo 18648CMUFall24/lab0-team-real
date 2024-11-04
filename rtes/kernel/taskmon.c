@@ -21,49 +21,68 @@ static struct kobject *util_kobject;
 // Function to show utilization for task per data point
 static ssize_t util_file_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf) 
 {
-    struct threadNode *task = container_of(kobj, struct threadNode, thread_obj);
+    //struct threadNode *task = container_of(kobj, struct threadNode, thread_obj);
+
+    //printk(KERN_INFO "Cost: %llu\n",task->cost_us);
+    //printk(KERN_INFO "Thread: %llu\n",task->cost_us);
+    //printk(KERN_INFO "Period: %llu\n",task->periodDuration);
     
     return sprintf(buf, "return data!\n");
-    return 0;
+
 }
 
-// Define sysfs attribute for utilization
-static struct kobj_attribute utilization_attribute = __ATTR(utilization, 0664, util_file_show, NULL);
-
+//kstrtoint 
 
 //Create Thread Virtual File for the thread
+// Create Thread Virtual File for the thread
 int createThreadFile(struct threadNode *thread)
 {
     int error = 0;
-    char tid_name[16];
+    struct kobj_attribute *threadAtt;
 
-    // Create a name for the kobject using the tid
-    snprintf(tid_name, sizeof(tid_name), "%d", thread->tid);
-
-    //Create a kobject for the thread under util directory
-    thread->thread_obj = kobject_create_and_add(tid_name, util_kobject);
-    if (!thread->thread_obj) {
+    // Allocate memory for the kobj_attribute
+    threadAtt = kzalloc(sizeof(struct kobj_attribute), GFP_KERNEL);
+    if (!threadAtt) {
         return -ENOMEM;
     }
 
+    // Create a name for the kobject using the tid
+    threadAtt->attr.name = kmalloc(16, GFP_KERNEL);
+    if (!threadAtt->attr.name) {
+        kfree(threadAtt);
+        return -ENOMEM;
+    }
+    
+    snprintf((char *)threadAtt->attr.name, 16, "%d", thread->tid);
+    printk(KERN_INFO "File name: %s\n", threadAtt->attr.name);
+
+    // Set up the kobj_attribute fields
+    threadAtt->attr.mode = 0664;
+    threadAtt->show = util_file_show;
+    threadAtt->store = NULL;
 
     // Add the utilization file to the thread's kobject
-    error = sysfs_create_file(thread->thread_obj, &utilization_attribute.attr);
+    error = sysfs_create_file(util_kobject, &threadAtt->attr);
     if (error) {
-        kobject_put(thread->thread_obj); // Clean up on failure
+        printk(KERN_INFO "error with number %d\n", error);
+        kfree(threadAtt->attr.name);
+        kfree(threadAtt);
         return -1;
     }
 
+    // Store a reference to the attribute in the thread structure if needed
+    thread->thread_obj = threadAtt;
 
     return 0;
 }
 
 int removeThreadFile(struct threadNode  *thread)
 {
-     // Remove the sysfs file associated with the kobject
-    sysfs_remove_file(thread->thread_obj, &utilization_attribute.attr);
+    // Remove the sysfs file associated with the kobject
+    sysfs_remove_file(util_kobject, &thread->thread_obj->attr);
     // Remove the kobject
-    kobject_put(thread->thread_obj);
+    kfree(thread->thread_obj->attr.name);
+    kfree(thread->thread_obj);
     
     return 0;
 }
