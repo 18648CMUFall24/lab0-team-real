@@ -8,9 +8,14 @@
 #include <stdint.h>
 #include <sys/syscall.h>
 #include <sys/time.h>
+#include <signal.h>
 
 const uint64_t CLOCKS_PER_MSEC = (uint64_t)CLOCKS_PER_SEC / 1000;
 const uint64_t CLOCKS_PER_NSEC = (uint64_t)CLOCKS_PER_SEC / 1000000000;
+
+void handle_sigexcess() {
+    printf("SIGEXCESS recieved\n");
+}
 
 void increment_by_period(struct timeval *time, uint64_t period_s, int64_t period_us) {
     time->tv_sec += period_s;
@@ -62,6 +67,7 @@ int main(int argc, char *argv[]) {
     uint64_t clocks_running = cArg * CLOCKS_PER_MSEC;
     time_t period_s = tArg / 1000;
     suseconds_t period_us = (tArg % 1000) * 1000;
+    signal(SIGEXCESS, handle_sigexcess);
 
     // printf("Cost: %d ms (%lld clock cycles)\n", cArg, clocks_running);
     // printf("Period: %d ms (%d s %d us)\n", tArg, period_s, period_us);
@@ -103,3 +109,4 @@ int main(int argc, char *argv[]) {
 
     return 0;
 }
+
