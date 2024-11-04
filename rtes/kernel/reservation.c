@@ -19,6 +19,7 @@ static struct rtesThreadHead threadHead;
 static bool head_was_init = false;
 
 static size_t amountReserved;
+void debugPrints(void);
 
 
 void threadHead_init(void) {
@@ -248,44 +249,19 @@ int removeThreadInScheduleLL(pid_t tid) {
 	return -1;
 }
 
-void debugPrints(){
-	if(amountReserved == 0) {
-		printk(KERN_INFO "Empty Linked List!\n");
-	} else {
-		if(amountReserved >= 1) {
-			struct threadNode *loopedThread = threadHead.head;
-			printk(KERN_INFO "amount reserved is %d\n", amountReserved);
-			printk(KERN_INFO "Thread ID: %lld, CPU ID: %lld, Period Duration: %llu, Cost: %llu\n",
-	  (long long)loopedThread->tid,
-	  (long long)loopedThread->cpuid,
-	  (unsigned long long)ktime_to_us(loopedThread->periodDuration),
-	  (unsigned long long)loopedThread->cost_us);
+void debugPrints() {
+	size_t i;
+	struct threadNode *loopedThread = threadHead.head;
 
-		} if(amountReserved >= 2) {
-			struct threadNode *loopedThread = threadHead.head->next;
-			printk(KERN_INFO "amount reserved is %d", amountReserved);
-			printk(KERN_INFO "Thread ID: %lld, CPU ID: %lld, Period Duration: %llu, Cost: %llu\n",
-	  (long long)loopedThread->tid,
-	  (long long)loopedThread->cpuid,
-	  (unsigned long long)ktime_to_us(loopedThread->periodDuration),
-	  (unsigned long long)loopedThread->cost_us);
-		} if(amountReserved >= 3) {
-			struct threadNode *loopedThread = threadHead.head->next->next;
-			printk(KERN_INFO "amount reserved is %d\n", amountReserved);
-			printk(KERN_INFO "Thread ID: %lld, CPU ID: %lld, Period Duration: %llu, Cost: %llu\n",
-	  (long long)loopedThread->tid,
-	  (long long)loopedThread->cpuid,
-	  (unsigned long long)ktime_to_us(loopedThread->periodDuration),
-	  (unsigned long long)loopedThread->cost_us);
-		} if(amountReserved >= 4) {
-			struct threadNode *loopedThread = threadHead.head->next->next->next;
-			printk(KERN_INFO "amount reserved is %d\n", amountReserved);
-			printk(KERN_INFO "Thread ID: %lld, CPU ID: %lld, Period Duration: %llu, Cost: %llu\n",
-	  (long long)loopedThread->tid,
-	  (long long)loopedThread->cpuid,
-	  (unsigned long long)ktime_to_us(loopedThread->periodDuration),
-	  (unsigned long long)loopedThread->cost_us);
-		}
+	if(amountReserved == 0) { printk(KERN_INFO "Empty Linked List!\n"); } 
+	else { printk(KERN_INFO "amount reserved is %d\n", amountReserved); } 
+
+	for (i = 0; i < amountReserved; i++) {
+		printk(KERN_INFO "Thread ID: %lld, CPU ID: %lld, Period Duration: %llu, Cost: %llu\n", 
+			(long long)loopedThread->tid, 
+			(long long)loopedThread->cpuid, 
+			(unsigned long long)ktime_to_us(loopedThread->periodDuration), 
+			(unsigned long long)loopedThread->cost_us);
 	}
 }
 
