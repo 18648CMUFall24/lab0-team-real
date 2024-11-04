@@ -15,7 +15,7 @@ int main(int argc, char **argv) {
 	return -1;
     }
 
-    int x = syscall(__NR_calc, argv[1], argv[3], *argv[2], buf);
+    int x = calc(argv[1], argv[3], *argv[2], buf);
     if (x) {
 	printf("nan\n");
     } else {
