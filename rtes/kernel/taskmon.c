@@ -21,6 +21,8 @@ static struct kobject *util_kobject;
 // Function to show utilization for task per data point
 static ssize_t util_file_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf) 
 {
+    struct threadNode *task = container_of(kobj, struct threadNode, thread_obj);
+    
     return sprintf(buf, "return data!\n");
     return 0;
 }

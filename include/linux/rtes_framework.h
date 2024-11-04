@@ -22,9 +22,6 @@ struct threadNode {
     ktime_t prev_schedule;	// Period time remaining at start of running
     struct hrtimer high_res_timer;	// High-res timer
     struct kobject *thread_obj; // Pointer to the kObject for the file
-    char *data_buffer;
-    unsigned long totalCost;
-    unsigned long period;
     struct threadNode* next;	// Pointer to the next node
 };
 
