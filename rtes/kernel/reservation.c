@@ -144,7 +144,7 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 		new_node->high_res_timer.function = &restart_period;
 		
 		//Creating thread utilziation file
-		createThreadFile(tid, new_node->thread_obj);
+		createThreadFile(new_node);
 
 		//setting the thread head and its next
 		new_node->next = threadHead.head;
@@ -292,7 +292,7 @@ int removeThreadInScheduleLL(pid_t tid) {
 		if(loopedThread->tid == tid) {
 
 			//remove the thread file utilization 
-			removeThreadFile(tid, loopedThread->thread_obj);
+			removeThreadFile(loopedThread);
 			//remove from linked List
 			if(prev != NULL) {	
 				prev->next = loopedThread->next;

@@ -5,8 +5,10 @@
 #include <linux/mutex.h>
 #include <linux/rtes_framework.h>
 #include <linux/hrtimer.h>
+#include <linux/slab.h>
 
 
+#define BUFFER_SIZE    4096
 
 static struct kobject *taskmon_kobj;
 static bool monitoring_active = false;
@@ -16,8 +18,6 @@ static struct kobject *rtes_kobject;
 static struct kobject *taskmon_kobject;
 static struct kobject *util_kobject;
 
-
-
 // Function to show utilization for task per data point
 static ssize_t util_file_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf) 
 {
@@ -25,31 +25,30 @@ static ssize_t util_file_show(struct kobject *kobj, struct kobj_attribute *attr,
     return 0;
 }
 
-
 // Define sysfs attribute for utilization
 static struct kobj_attribute utilization_attribute = __ATTR(utilization, 0664, util_file_show, NULL);
 
 
-
-int createThreadFile(pid_t tid, struct kobject *thread_obj)
+//Create Thread Virtual File for the thread
+int createThreadFile(struct threadNode *thread)
 {
     int error = 0;
     char tid_name[16];
 
     // Create a name for the kobject using the tid
-    snprintf(tid_name, sizeof(tid_name), "%d", tid);
+    snprintf(tid_name, sizeof(tid_name), "%d", thread->tid);
 
     //Create a kobject for the thread under util directory
-    thread_obj = kobject_create_and_add(tid_name, util_kobject);
-    if (!thread_obj) {
+    thread->thread_obj = kobject_create_and_add(tid_name, util_kobject);
+    if (!thread->thread_obj) {
         return -ENOMEM;
     }
 
 
     // Add the utilization file to the thread's kobject
-    error = sysfs_create_file(thread_obj, &utilization_attribute.attr);
+    error = sysfs_create_file(thread->thread_obj, &utilization_attribute.attr);
     if (error) {
-        kobject_put(thread_obj); // Clean up on failure
+        kobject_put(thread->thread_obj); // Clean up on failure
         return -1;
     }
 
@@ -57,12 +56,12 @@ int createThreadFile(pid_t tid, struct kobject *thread_obj)
     return 0;
 }
 
-int removeThreadFile(pid_t tid, struct kobject *thread_obj)
+int removeThreadFile(struct threadNode  *thread)
 {
-    // Remove the sysfs file associated with the kobject
-    sysfs_remove_file(thread_obj, &utilization_attribute.attr);
+     // Remove the sysfs file associated with the kobject
+    sysfs_remove_file(thread->thread_obj, &utilization_attribute.attr);
     // Remove the kobject
-    kobject_put(thread_obj);
+    kobject_put(thread->thread_obj);
     
     return 0;
 }

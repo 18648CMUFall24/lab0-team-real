@@ -21,9 +21,11 @@ struct threadNode {
     u64 periodTime;	// Accumulator for period time (us)
     ktime_t prev_schedule;	// Period time remaining at start of running
     struct hrtimer high_res_timer;	// High-res timer
-    struct threadNode* next;	// Pointer to the next node
     struct kobject *thread_obj; // Pointer to the kObject for the file
-
+    char *data_buffer;
+    unsigned long totalCost;
+    unsigned long period;
+    struct threadNode* next;	// Pointer to the next node
 };
 
 
@@ -33,8 +35,8 @@ void rtesScheduleTask(struct threadNode *task);
 void rtesDescheduleTask(struct threadNode *task);
 struct threadNode *findThreadInScheduleLL(pid_t tid);
 int removeThreadInScheduleLL(pid_t tid);
-int createThreadFile(pid_t tid, struct kobject *thread_obj);
-int removeThreadFile(pid_t tid, struct kobject *thread_obj);
+int createThreadFile(struct threadNode  *thread);
+int removeThreadFile(struct threadNode  *thread);
 
 
 #endif /* _RTES_FRAMEWORK_H */
