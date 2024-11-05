@@ -21,14 +21,36 @@ static struct kobject *util_kobject;
 // Function to show utilization for task per data point
 static ssize_t util_file_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf) 
 {
-    //struct threadNode *task = container_of(kobj, struct threadNode, thread_obj);
+    int extractTid;
+    struct threadNode *loopedThread = threadHead.head;
+    int ret = kstrtoint(attr->attr.name, 10, &extractTid);
+    ktime_t elapsed_time; 
+    unsigned long long elapsed_ms;
 
-    //printk(KERN_INFO "Cost: %llu\n",task->cost_us);
-    //printk(KERN_INFO "Thread: %llu\n",task->cost_us);
-    //printk(KERN_INFO "Period: %llu\n",task->periodDuration);
-    
-    return sprintf(buf, "return data!\n");
+    if(monitoring_active)
+    {
+        if (ret != 0) {
+            printk(KERN_ERR "Failed to convert attr name to integer, error: %d\n", ret);
+            return ret; // Return the error code if conversion fails
+        }
 
+        while(loopedThread != NULL) {
+            if(loopedThread->tid == extractTid)
+            {
+                break;
+            }
+        
+        }
+        
+        elapsed_time = ktime_sub(ktime_get(), loopedThread->startTimer);
+        elapsed_ms = ktime_to_ms(elapsed_time);
+
+        return sprintf(buf, "%llu %s\n",elapsed_ms, loopedThread->utilization);
+    }
+    else
+    {
+        return sprintf(buf, "Monitoring not active!\n");
+    }
 }
 
 //kstrtoint 

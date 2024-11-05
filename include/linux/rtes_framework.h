@@ -10,6 +10,8 @@
 #include <linux/kobject.h>
 
 
+extern struct rtesThreadHead threadHead;
+
 // Define the structure for linked list nodes
 struct threadNode {
     struct timespec C;		// Computation time (ms)
@@ -22,7 +24,14 @@ struct threadNode {
     ktime_t prev_schedule;	// Period time remaining at start of running
     struct hrtimer high_res_timer;	// High-res timer
     struct kobj_attribute *thread_obj; // Pointer to the kObject for the file
+    ktime_t startTimer;
+    char utilization[20];
     struct threadNode* next;	// Pointer to the next node
+};
+
+struct rtesThreadHead {
+	struct threadNode* head; 
+	spinlock_t mutex;
 };
 
 

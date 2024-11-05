@@ -7,12 +7,8 @@
 #include <linux/spinlock.h>
 
 
-struct rtesThreadHead {
-	struct threadNode* head; 
-	spinlock_t mutex;
-};
 
-static struct rtesThreadHead threadHead;
+struct rtesThreadHead threadHead;
 static bool head_was_init = false;
 
 int amountReserved;
@@ -62,6 +58,10 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 	struct timespec c,t;
 	struct cpumask cpumask;
 	struct threadNode *lookThread = NULL;
+	char periodString[10];
+	char executeString[10];
+	char calcResult[10] = {};
+	int ret;
 
 	if(cpuid < 0 && cpuid > 3) {
 
@@ -142,7 +142,26 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 		new_node->periodTime = 0;
 		hrtimer_init(&new_node->high_res_timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
 		new_node->high_res_timer.function = &restart_period;
+		new_node->startTimer = ktime_get();
 		
+		//comvert to string
+		sprintf(periodString, "%llu", ktime_to_ms(new_node->periodDuration));
+		sprintf(executeString, "%llu", ktime_to_ms(timespec_to_ktime(c)));
+
+		printk(KERN_INFO "Period is: %s\n", periodString);
+		printk(KERN_INFO "executeString is: %s\n", executeString);
+
+		//Calculate the 
+		ret = sys_calc(executeString,periodString,'/',calcResult);
+		if (ret != 0) {
+        	printk(KERN_ERR "sys_calc failed with error: %d\n", ret);
+        	
+    	}
+
+		strncpy(new_node->utilization, calcResult, sizeof(new_node->utilization));
+		printk(KERN_INFO "Utilization is: %s\n", new_node->utilization);
+
+
 		//Creating thread utilziation file
 		createThreadFile(new_node);
 
