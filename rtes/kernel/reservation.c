@@ -11,16 +11,9 @@
 #include <asm/siginfo.h>
 
 
-struct rtesThreadHead {
-	struct threadNode* head; 
-	spinlock_t mutex;
-	unsigned long flags;
-};
-
-static struct rtesThreadHead threadHead;
-static bool head_was_init = false;
-
 static size_t amountReserved;
+struct rtesThreadHead threadHead;
+static bool head_was_init;
 
 void debugPrints(void);
 
@@ -41,14 +34,68 @@ void unlockScheduleLL(void) {
 
 static enum hrtimer_restart restart_period(struct hrtimer *timer) {
 	struct timespec cur;
+	ktime_t elapsed_time;
 	struct threadNode *task = container_of(timer, struct threadNode, high_res_timer);
+	char periodString[10];
+	char executeString[10];
+	char calcResult[10] = {};
+	int ret;
 
 	hrtimer_forward_now(timer, task->periodDuration);
-	task->periodTime = 0;
+	
 
 	getrawmonotonic(&cur);
 	task->prev_schedule = timespec_to_ns(&cur);
 
+	if(monitoring_active)
+	{
+
+		elapsed_time = ktime_sub(ktime_get(), task->startTimer);
+
+		//converting to string
+		sprintf(periodString, "%llu", div64_u64(ktime_to_ns(task->periodDuration),1000000));
+		sprintf(executeString, "%llu",div64_u64(task->periodTime,1000000));
+		printk(KERN_INFO "Period is: %s\n", periodString);
+		printk(KERN_INFO "Cost is: %s\n", executeString);
+
+		//Calculate the utilization
+		ret = sys_calc(executeString,periodString,'/',calcResult);
+		printk(KERN_INFO "calculated utilization is: %s\n", calcResult);
+
+		if (ret != 0) {
+        	printk(KERN_ERR "sys_calc failed with error: %d\n", ret);
+		}
+		else
+		{
+
+			strncpy(task->utilization, calcResult, sizeof(task->utilization));
+
+		}
+
+
+
+		if(BUFFER_SIZE - task->offset < 20)
+		{
+			printk(KERN_INFO "Buffer full with offset: %d\n", task->offset);
+		}
+		else
+		{
+			task->offset += sprintf(task->dataBuffer+task->offset,"%llu %s\n",ktime_to_ms(elapsed_time),task->utilization);
+
+			printk(KERN_INFO "offset increased: %d\n", task->offset);
+			printk(KERN_INFO "Time passed: %llu\n", ktime_to_ms(elapsed_time));
+			//printk(KERN_INFO "Utilization: %s\n", task->dataBuffer);
+		}
+
+	}
+	else
+	{
+
+		memset(task->dataBuffer,0,BUFFER_SIZE);
+		task->offset = 0;
+	}
+
+	task->periodTime = 0;
 	return HRTIMER_RESTART;
 }
 
@@ -120,8 +167,13 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 	struct threadNode *node;
 	struct timespec c,t;
 	struct cpumask cpumask;
+	char periodString[10];
+	char executeString[10];
+	char calcResult[10] = {};
+	int ret;
+	bool exists = false;
 
-	if(cpuid < 0 && cpuid > 3) {
+	if(cpuid < 0 || cpuid > 3) {
 		printk(KERN_INFO "CPU ID does not exist!\n");
 		return EINVAL;
 	}
@@ -179,6 +231,7 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 			amountReserved++;
 		} else {
 			printk(KERN_DEBUG "Modifying an existing reservation");
+			exists = true;
 		}
 
 		node->C = c;
@@ -190,6 +243,31 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 		node->periodTime = 0;
 		node->prev_schedule = 0;
 		node->actively_running = false;
+
+		//converting to string
+		sprintf(periodString, "%llu", ktime_to_ms(node->periodDuration));
+		sprintf(executeString, "%llu", ktime_to_ms(timespec_to_ktime(c)));
+
+		//Calculate the utilization
+		ret = sys_calc(executeString,periodString,'/',calcResult);
+		if (ret != 0) {
+        	printk(KERN_ERR "sys_calc failed with error: %d\n", ret);
+		}
+		else
+		{
+			strncpy(node->utilization, calcResult, sizeof(node->utilization));
+
+		}
+
+		printk(KERN_INFO "Utilization is: %s\n", node->utilization);
+
+		//Creating thread utilziation file if nodes is not already exist
+		if(!exists)
+		{
+			createThreadFile(node);
+		}
+
+		//start the timer
 		hrtimer_start(&node->high_res_timer, node->periodDuration, HRTIMER_MODE_ABS);
 
 	} while (0);
@@ -245,7 +323,11 @@ int removeThreadInScheduleLL(pid_t tid) {
 			} else {
 				prev->next = loopedThread->next;
 			}
-
+			
+			//remove the thread file utilization 
+			removeThreadFile(loopedThread);
+			
+			//cancel timer
 			hrtimer_cancel(&loopedThread->high_res_timer);
 			kfree(loopedThread);
 			amountReserved--;
