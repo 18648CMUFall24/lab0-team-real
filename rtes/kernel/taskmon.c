@@ -24,16 +24,17 @@ static ssize_t util_file_show(struct kobject *kobj, struct kobj_attribute *attr,
     int extractTid;
     struct threadNode *loopedThread = threadHead.head;
     int ret = kstrtoint(attr->attr.name, 10, &extractTid);
-    //ktime_t elapsed_time; 
     size_t offset = 0;
-    //unsigned long long elapsed_ms;
-    
+    size_t count = 0;
 
+    
+    lockScheduleLL();
     if(monitoring_active)
     {
         if (ret != 0) {
             printk(KERN_ERR "Failed to convert attr name to integer, error: %d\n", ret);
-            return ret; // Return the error code if conversion fails
+            unlockScheduleLL();
+            return count; // Return the error code if conversion fails
         }
 
         //Go through to see if the node is in there
@@ -49,11 +50,11 @@ static ssize_t util_file_show(struct kobject *kobj, struct kobj_attribute *attr,
 
         if(loopedThread != NULL)
         {
-            //elapsed_time = ktime_sub(ktime_get(), loopedThread->startTimer);
-            //elapsed_ms = ktime_to_ms(elapsed_time);
+
         }
         else
         {
+            unlockScheduleLL();
             return sprintf(buf, "Thread not found!\n");
         }
 
@@ -62,10 +63,12 @@ static ssize_t util_file_show(struct kobject *kobj, struct kobj_attribute *attr,
         memset(loopedThread->dataBuffer,0,BUFFER_SIZE);
         loopedThread->offset = 0;
         
+        unlockScheduleLL();
         return offset;
     }
     else
     {
+        unlockScheduleLL();
         return sprintf(buf, "Monitoring not active!\n");
     }
 }
