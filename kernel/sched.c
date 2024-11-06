@@ -72,6 +72,7 @@
 #include <linux/ftrace.h>
 #include <linux/slab.h>
 #include <linux/cpuacct.h>
+#include <linux/rtes_framework.h>
 
 #include <asm/tlb.h>
 #include <asm/irq_regs.h>
@@ -122,8 +123,7 @@
 #define DEF_TIMESLICE		(100 * HZ / 1000)
 
 /*
- * single value that denotes runtime == period, ie unlimited time.
- */
+ * single value that denotes runtime == period, ie unlimited time. */
 #define RUNTIME_INF	((u64)~0ULL)
 
 static inline int rt_policy(int policy)
@@ -4318,6 +4318,8 @@ need_resched:
 		rq->curr = next;
 		++*switch_count;
 
+		rtesDescheduleTask(prev);
+		rtesScheduleTask(next);
 		context_switch(rq, prev, next); /* unlocks the rq */
 		/*
 		 * The context switch have flipped the stack from under us
