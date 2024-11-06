@@ -74,10 +74,12 @@ void rtesDescheduleTask(struct task_struct *task) {
 		if (node->periodTime > node->cost_ns) {
 			printk(KERN_DEBUG "Task %d exceeded scheduled computation time (%lld). Has run for %lld ns",
 				  node->tid, node->cost_ns, node->periodTime);
+
 			memset(&info, 0, sizeof(siginfo_t));
 			info.si_signo = SIGEXCESS;
 			info.si_code = SI_KERNEL;
 			info.si_int = SIGEXCESS;
+
 			if(send_sig_info(SIGEXCESS, &info, task)) {
 				printk(KERN_ERR "Failed to send SIGEXCESS to thread %d", task->pid);
 			}
