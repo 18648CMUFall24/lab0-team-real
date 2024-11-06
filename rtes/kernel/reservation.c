@@ -38,23 +38,6 @@ void unlockScheduleLL(void) {
 	if (head_was_init) spin_unlock_irqrestore(&threadHead.mutex, threadHead.flags);
 }
 
-int sendSigExcess(struct task_struct *task) {
-	siginfo_t info;
-	int output = 0;
-
-	memset(&info, 0, sizeof(siginfo_t));
-	info.si_signo = SIGEXCESS;
-	info.si_code = SI_KERNEL;
-	info.si_int = SIGEXCESS;
-
-	output = send_sig_info(SIGEXCESS, &info, task);
-	if (output < 0) {
-		printk(KERN_ERR "Failed to send SIGEXCESS to thread %d", task->pid);
-	}
-
-	return output;
-}
-
 static enum hrtimer_restart restart_period(struct hrtimer *timer) {
 	struct timespec cur;
 	struct threadNode *task = container_of(timer, struct threadNode, high_res_timer);
@@ -71,6 +54,7 @@ static enum hrtimer_restart restart_period(struct hrtimer *timer) {
 void rtesDescheduleTask(struct task_struct *task) {
 	struct threadNode *node;
 	struct timespec cur;
+	siginfo_t info;
 
 	if (task == NULL) return;
 
@@ -86,14 +70,18 @@ void rtesDescheduleTask(struct task_struct *task) {
 		getrawmonotonic(&cur);
 		node->periodTime += timespec_to_ns(&cur) - node->prev_schedule;
 
-		/*
 		// Send SIGEXCESS if overran period
 		if (node->periodTime > node->cost_ns) {
 			printk(KERN_DEBUG "Task %d exceeded scheduled computation time (%lld). Has run for %lld ns",
 				  node->tid, node->cost_ns, node->periodTime);
-			sendSigExcess(task);
+			memset(&info, 0, sizeof(siginfo_t));
+			info.si_signo = SIGEXCESS;
+			info.si_code = SI_KERNEL;
+			info.si_int = SIGEXCESS;
+			if(send_sig_info(SIGEXCESS, &info, task)) {
+				printk(KERN_ERR "Failed to send SIGEXCESS to thread %d", task->pid);
+			}
 		}
-		*/
 
 		node->actively_running = false;
 	} while (0);
