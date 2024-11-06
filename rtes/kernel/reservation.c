@@ -21,45 +21,39 @@ void threadHead_init(void) {
 }
 
 void lockScheduleLL() {
-	if (head_was_init) spin_lock_irq(&threadHead.mutex);
+	if (head_was_init) spin_lock_irqsave(&threadHead.mutex, threadHead.flags);
 }
 
 void unlockScheduleLL() {
-	if (head_was_init) spin_unlock_irq(&threadHead.mutex);
+	if (head_was_init) spin_unlock_irqrestore(&threadHead.mutex,threadHead.flags);
 }
 
 static enum hrtimer_restart restart_period(struct hrtimer *timer) {
-	char periodString[10];
-	char executeString[10];
-	char utilString[10];
-	int error;
 	ktime_t elapsed_time;
 	struct threadNode *task = container_of(timer, struct threadNode, high_res_timer);
 	hrtimer_forward_now(timer, task->periodDuration);
 	task->periodTime = 0;
 	task->prev_schedule = hrtimer_get_remaining(timer);
-	//task->periodIncrement += ktime_to_ms(task->periodDurlation);
-	//task->costIncrement += ktime_to_us(timespec_to_ktime(task->C));
 
+	lockScheduleLL();
 	if(monitoring_active)
 	{
-		//lockScheduleLL();
-		//sprintf(periodString, "%lu", task->periodIncrement);
-		//sprintf(executeString, "%lu", task->costIncrement);
-
-		//rror = sys_calc(executeString,periodString,'/',utilString);
-		//if (error != 0) {
-       // 	printk(KERN_ERR "sys_calc failed with error: %d\n", error);
-        	
-    	//}
 
 		elapsed_time = ktime_sub(ktime_get(), task->startTimer);
-		task->offset += sprintf(task->dataBuffer+task->offset,"%llu %s\n",ktime_to_ms(elapsed_time),task->utilization);
+		
+		if(BUFFER_SIZE - task->offset < 20)
+		{
+			printk(KERN_INFO "Buffer full with offset: %d\n", task->offset);
+		}
+		else
+		{
+			task->offset += sprintf(task->dataBuffer+task->offset,"%llu %s\n",ktime_to_ms(elapsed_time),task->utilization);
 
-		printk(KERN_INFO "offset increased: %d\n", task->offset);
-		printk(KERN_INFO "Time passed: %llu\n", ktime_to_ms(elapsed_time));
-		printk(KERN_INFO "Utilization: %s\n", task->dataBuffer);
-		//unlockScheduleLL();
+			printk(KERN_INFO "offset increased: %d\n", task->offset);
+			printk(KERN_INFO "Time passed: %llu\n", ktime_to_ms(elapsed_time));
+			//printk(KERN_INFO "Utilization: %s\n", task->dataBuffer);
+		}
+		
 	}
 	else
 	{
@@ -67,6 +61,8 @@ static enum hrtimer_restart restart_period(struct hrtimer *timer) {
 		memset(task->dataBuffer,0,BUFFER_SIZE);
 		task->offset = 0;
 	}
+	unlockScheduleLL();
+
 	return HRTIMER_RESTART;
 }
 

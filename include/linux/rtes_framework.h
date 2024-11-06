@@ -27,8 +27,6 @@ struct threadNode {
     struct kobj_attribute *thread_obj; // Pointer to the kObject for the file
     ktime_t startTimer;
     char utilization[20];
-    unsigned long periodIncrement;
-    unsigned long costIncrement;
     size_t offset;
     char dataBuffer[BUFFER_SIZE];
     struct threadNode* next;	// Pointer to the next node
@@ -37,6 +35,7 @@ struct threadNode {
 struct rtesThreadHead {
 	struct threadNode* head; 
 	spinlock_t mutex;
+    unsigned long flags;
 };
 
 
