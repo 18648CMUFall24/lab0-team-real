@@ -8,6 +8,8 @@
 #include <errno.h>
 #include <time.h>
 
+#include "reserve.h"
+
 // Main function: entry point for execution
 int main(int argc, char *argv[]) 
 {
@@ -36,7 +38,7 @@ int main(int argc, char *argv[])
         struct timespec C = { .tv_sec = atoi(argv[4]) / 1000, .tv_nsec = ((atoi(argv[4])%1000) *1000000)};
         int cpu = atoi(argv[5]);
 
-        returnSys = syscall(__NR_set_reserve,threadID,&T,&C,cpu);
+        returnSys = set_reserve(threadID,&T,&C,cpu);
         if(returnSys < 0)
         {
             printf("Error in syscall!\n");
@@ -54,7 +56,7 @@ int main(int argc, char *argv[])
             return -1;
         }
 
-        returnSys = syscall(__NR_cancel_reserve,threadID);
+        returnSys = cancel_reserve(threadID);
 
         if(returnSys < 0)
         {
