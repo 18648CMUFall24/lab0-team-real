@@ -2,19 +2,19 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
+#include <time.h> 
 #include <unistd.h>
 #include <sched.h>
 #include <stdint.h>
 #include <sys/syscall.h>
 #include <sys/time.h>
 #include <signal.h>
-
 const uint64_t CLOCKS_PER_MSEC = (uint64_t)CLOCKS_PER_SEC / 1000;
 const uint64_t CLOCKS_PER_NSEC = (uint64_t)CLOCKS_PER_SEC / 1000000000;
 
 void handle_sigexcess() {
     printf("SIGEXCESS recieved\n");
+    exit(-1);
 }
 
 void increment_by_period(struct timeval *time, uint64_t period_s, int64_t period_us) {
@@ -87,20 +87,23 @@ int main(int argc, char *argv[]) {
         increment_by_period(&next_wakeup, period_s, period_us);
         clock_t start = clock();
         clock_t clocks_periodElapsedTime = 0;
+        uint64_t start_time, end_time;
 
-        // printf("Started period...");
-        // fflush(stdout);
+        start_time = clock() / CLOCKS_PER_MSEC;
+        // printf("Started period (%lld)...", start_time);
+        fflush(stdout);
 
         //pretend to do busy work
-        while(clocks_running >= clocks_periodElapsedTime)
+        while(clocks_periodElapsedTime < clocks_running)
         {
             clocks_periodElapsedTime = (clock() - start);
         }
 
-        // printf("Ended period %d\n", (clock() / CLOCKS_PER_SEC));
+        end_time = clock() / CLOCKS_PER_MSEC;
+        // printf("Ended period (%lld)\n", end_time);
 
         if (set_sleep_duration(&sleep_time, &next_wakeup) < 0) {
-            // printf("Overran period\n");
+            printf("Overran period\n");
             return -1;
         }
 

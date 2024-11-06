@@ -4319,8 +4319,8 @@ need_resched:
 		rq->curr = next;
 		++*switch_count;
 
-		context_switch(rq, prev, next); /* unlocks the rq */
 		rtesDescheduleTask(prev);
+		context_switch(rq, prev, next); /* unlocks the rq */
 		rtesScheduleTask(next);
 		/*
 		 * The context switch have flipped the stack from under us
@@ -4338,6 +4338,7 @@ need_resched:
 	preempt_enable_no_resched();
 	if (need_resched())
 		goto need_resched;
+
 }
 
 static inline void sched_submit_work(struct task_struct *tsk)
