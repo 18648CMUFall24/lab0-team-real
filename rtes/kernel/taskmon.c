@@ -26,35 +26,38 @@ static ssize_t util_file_show(struct kobject *kobj, struct kobj_attribute *attr,
 
     
     lockScheduleLL();
-    if(monitoring_active)
-    {
-        if (ret != 0) {
-            printk(KERN_ERR "Failed to convert attr name to integer, error: %d\n", ret);
-            unlockScheduleLL();
-            return count; // Return the error code if conversion fails
-        }
+    
+   
+    if (ret != 0) {
+        printk(KERN_ERR "Failed to convert attr name to integer, error: %d\n", ret);
+        unlockScheduleLL();
+        return count; // Return the error code if conversion fails
+    }
 
-        //Go through to see if the node is in there
-        
-        while(loopedThread != NULL) {
-            if(loopedThread->tid == extractTid)
-            {
-                break;
-            }
-            loopedThread = loopedThread->next;
+    //Go through to see if the node is in there
+    while(loopedThread != NULL) {
+        if(loopedThread->tid == extractTid)
+        {
+            break;
         }
+        loopedThread = loopedThread->next;
+    }
        
 
-        if(loopedThread != NULL)
-        {
+    if(loopedThread != NULL)
+    {
+        //Do Nothing
+    }
+    else
+    {
+        unlockScheduleLL();
+        return sprintf(buf, "Thread not found!\n");
+    }
 
-        }
-        else
-        {
-            unlockScheduleLL();
-            return sprintf(buf, "Thread not found!\n");
-        }
 
+    //check to see if there is data to read
+    if(loopedThread->offset > 0)
+    {
         offset = loopedThread->offset;
         strncpy(buf, loopedThread->dataBuffer, loopedThread->offset);
         memset(loopedThread->dataBuffer,0,BUFFER_SIZE);
@@ -66,7 +69,7 @@ static ssize_t util_file_show(struct kobject *kobj, struct kobj_attribute *attr,
     else
     {
         unlockScheduleLL();
-        return sprintf(buf, "Monitoring not active!\n");
+        return sprintf(buf, "No Data to read!\n");
     }
 }
 

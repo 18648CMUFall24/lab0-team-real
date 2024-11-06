@@ -90,9 +90,7 @@ static enum hrtimer_restart restart_period(struct hrtimer *timer) {
 	}
 	else
 	{
-
-		memset(task->dataBuffer,0,BUFFER_SIZE);
-		task->offset = 0;
+		//Do Nothing
 	}
 
 	task->periodTime = 0;
