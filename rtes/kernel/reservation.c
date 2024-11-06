@@ -45,6 +45,12 @@ static enum hrtimer_restart restart_period(struct hrtimer *timer) {
 
 	hrtimer_forward_now(timer, task->periodDuration);
 	task->periodTime = 0;
+	task->heartbeats++;
+	if (heartbeats > 2) {
+		// Task hasn't run since last period. Likely dead
+		sys_cancel_reserve(task->tid);
+		return HRTIMER_NORESTART;
+	}
 
 	getrawmonotonic(&cur);
 	task->prev_schedule = timespec_to_ns(&cur);
@@ -107,7 +113,7 @@ void  rtesScheduleTask(struct task_struct *task) {
 
 		getrawmonotonic(&cur);
 		node->prev_schedule = timespec_to_ns(&cur);
-
+		task->heartbeats = 0;
 		node->actively_running = true;
 	} while (0);
 
