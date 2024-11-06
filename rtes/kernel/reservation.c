@@ -82,18 +82,18 @@ void rtesDescheduleTask(struct task_struct *task) {
 		if (!(node->actively_running)) break; // Don't double deschedule
 		if (node->prev_schedule == 0) break; // Start on a clean period
 
-		printk(KERN_CRIT "DESCHEDULED %d\n", task->pid);
-
 		// Accumulate time running this period
 		getrawmonotonic(&cur);
 		node->periodTime += timespec_to_ns(&cur) - node->prev_schedule;
 
+		/*
 		// Send SIGEXCESS if overran period
 		if (node->periodTime > node->cost_ns) {
 			printk(KERN_DEBUG "Task %d exceeded scheduled computation time (%lld). Has run for %lld ns",
 				  node->tid, node->cost_ns, node->periodTime);
 			sendSigExcess(task);
 		}
+		*/
 
 		node->actively_running = false;
 	} while (0);
@@ -113,8 +113,6 @@ void  rtesScheduleTask(struct task_struct *task) {
 		node = findThreadInScheduleLL(task->pid);
 		if (node == NULL) break;
 		if (node->actively_running) break; // Don't double schedule
-		//
-		printk(KERN_CRIT "SCHEDULED %d\n", task->pid);
 
 		getrawmonotonic(&cur);
 		node->prev_schedule = timespec_to_ns(&cur);
@@ -196,7 +194,7 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 		node->T = t;
 		node->tid = tid;
 		node->cpuid = cpuid;
-		node->periodDuration = timespec_to_ktime(c);
+		node->periodDuration = timespec_to_ktime(t);
 		node->cost_ns = timespec_to_ns(&c);
 		node->periodTime = 0;
 		node->prev_schedule = 0;
@@ -204,6 +202,7 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 		hrtimer_start(&node->high_res_timer, node->periodDuration, HRTIMER_MODE_ABS);
 
 	} while (0);
+	debugPrints();
 
 	unlockScheduleLL();
 
@@ -221,6 +220,7 @@ SYSCALL_DEFINE1(cancel_reserve, pid_t, tid)
 
 	lockScheduleLL();
 	output = removeThreadInScheduleLL(tid);
+	debugPrints();
 	unlockScheduleLL();
 
 	return output;

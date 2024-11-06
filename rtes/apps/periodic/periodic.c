@@ -71,9 +71,9 @@ int main(int argc, char *argv[]) {
     signal(SIGEXCESS, handle_sigexcess);
 
 
-    printf("Cost: %d ms (%lld clock cycles)\n", cArg, clocks_running);
-    printf("Period: %d ms (%d s %d us)\n", tArg, period_s, period_us);
-    printf("Core: %d\n", cpuArg);
+    // printf("Cost: %d ms (%lld clock cycles)\n", cArg, clocks_running);
+    // printf("Period: %d ms (%d s %d us)\n", tArg, period_s, period_us);
+    // printf("Core: %d\n", cpuArg);
 
 
     // Setting up CPU affinity using syscall for sched_setaffinity
@@ -90,8 +90,8 @@ int main(int argc, char *argv[]) {
         clock_t start = clock();
         clock_t clocks_periodElapsedTime = 0;
 
-        printf("Started period...");
-        fflush(stdout);
+        // printf("Started period...");
+        // fflush(stdout);
 
         //pretend to do busy work
         while(clocks_periodElapsedTime < clocks_running)
@@ -99,7 +99,7 @@ int main(int argc, char *argv[]) {
             clocks_periodElapsedTime = (clock() - start);
         }
 
-        printf("Ended period %d\n", (clock() / CLOCKS_PER_SEC));
+        // printf("Ended period %d\n", (clock() / CLOCKS_PER_SEC));
 
         if (set_sleep_duration(&sleep_time, &next_wakeup) < 0) {
             printf("Overran period\n");
