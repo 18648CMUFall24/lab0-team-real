@@ -6,6 +6,7 @@
 #include <linux/slab.h>
 #include <linux/time.h>
 #include <linux/spinlock.h>
+#include <linux/signal.h>
 #include <asm/signal.h>
 #include <asm/siginfo.h>
 
