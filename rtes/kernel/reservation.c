@@ -204,17 +204,17 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 		amountReserved++;
 	}
 
-	if(amountReserved >= 1)
-	{
-		struct threadNode *loopedThread = threadHead.head;
-		printk(KERN_INFO "amount reserved is %d\n", amountReserved);
-		printk(KERN_INFO "Thread ID: %lld, CPU ID: %lld, Period Duration: %llu, Cost: %llu\n",
-       			(long long)loopedThread->tid,
-       			(long long)loopedThread->cpuid,
-       			(unsigned long long)ktime_to_us(loopedThread->periodDuration),
-       			(unsigned long long)loopedThread->cost_us);
+	// if(amountReserved >= 1)
+	// {
+	// 	struct threadNode *loopedThread = threadHead.head;
+	// 	printk(KERN_INFO "amount reserved is %d\n", amountReserved);
+	// 	printk(KERN_INFO "Thread ID: %lld, CPU ID: %lld, Period Duration: %llu, Cost: %llu\n",
+    //    			(long long)loopedThread->tid,
+    //    			(long long)loopedThread->cpuid,
+    //    			(unsigned long long)ktime_to_us(loopedThread->periodDuration),
+    //    			(unsigned long long)loopedThread->cost_us);
 
-	}
+	// }
 	// if(amountReserved >= 2)
 	// {
 	// 	struct threadNode *loopedThread = threadHead.head->next;
@@ -261,7 +261,7 @@ SYSCALL_DEFINE1(cancel_reserve, pid_t, tid)
 
 	lockScheduleLL();
 	output = removeThreadInScheduleLL(tid);
-	amountReserved--;
+	
 
 	if(amountReserved == 0)
 	{
@@ -344,13 +344,16 @@ int removeThreadInScheduleLL(pid_t tid) {
 
 			//remove the thread file utilization 
 			removeThreadFile(loopedThread);
+			//cancel the hrtimer
+			hrtimer_cancel(&loopedThread->high_res_timer);
+
 			//remove from linked List
 			if(prev != NULL) {	
 				prev->next = loopedThread->next;
 			} else {
 				threadHead.head = loopedThread->next;
 			}
-
+			amountReserved--;
 			kfree(loopedThread);
 			loopedThread = NULL;
 			return 0;
