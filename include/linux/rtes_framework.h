@@ -21,11 +21,13 @@ struct threadNode {
     struct timespec T;		    // Period time (ms)
     pid_t tid;			    // Thread ID
     int cpuid;			    // CPU ID
+    int heartbeats;         //Check to see if thread has died
     ktime_t periodDuration;	    // Duration as ktime_t
     u64 cost_ns;		    // Cost as ns
     u64 periodTime;		    // Accumulator for period time (ns)
     u64 prev_schedule;		    // Time of previous scheduling
     bool actively_running;	    // Flag to see if currently running
+    bool fileRemoved;            //Flag to set fileRemoved when thread or sigexcess
     struct hrtimer high_res_timer;  // High-res timer
     struct kobj_attribute *thread_obj; // Pointer to the kObject for the file
     ktime_t startTimer;              //Start time of when the thread was reserved

@@ -44,6 +44,18 @@ static enum hrtimer_restart restart_period(struct hrtimer *timer) {
 	hrtimer_forward_now(timer, task->periodDuration);
 	
 
+	task->heartbeats++;
+	printk(KERN_INFO "Heartbeat is: %d\n", task->heartbeats);
+	
+	if (task->heartbeats >= 5 && !task->fileRemoved ) {
+		// Task hasn't run since last 4 period. Likely dead
+		printk(KERN_INFO "Task Died!\n");
+		removeThreadFile(task);
+		task->fileRemoved = true;
+		//task->periodTime = 0;
+		return HRTIMER_NORESTART;
+	}
+
 	getrawmonotonic(&cur);
 	task->prev_schedule = timespec_to_ns(&cur);
 
@@ -152,7 +164,7 @@ void  rtesScheduleTask(struct task_struct *task) {
 
 		getrawmonotonic(&cur);
 		node->prev_schedule = timespec_to_ns(&cur);
-
+		node->heartbeats = 0;
 		node->actively_running = true;
 	} while (0);
 
@@ -263,6 +275,7 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 		if(!exists)
 		{
 			createThreadFile(node);
+			node->fileRemoved = false;
 		}
 
 		//start the timer
