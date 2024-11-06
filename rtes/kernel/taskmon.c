@@ -8,10 +8,10 @@
 #include <linux/slab.h>
 
 
-#define BUFFER_SIZE    4096
+
 
 static struct kobject *taskmon_kobj;
-static bool monitoring_active = false;
+bool monitoring_active = false;
 static DEFINE_MUTEX(monitoring_lock);
 
 static struct kobject *rtes_kobject;
@@ -24,8 +24,10 @@ static ssize_t util_file_show(struct kobject *kobj, struct kobj_attribute *attr,
     int extractTid;
     struct threadNode *loopedThread = threadHead.head;
     int ret = kstrtoint(attr->attr.name, 10, &extractTid);
-    ktime_t elapsed_time; 
-    unsigned long long elapsed_ms;
+    //ktime_t elapsed_time; 
+    size_t offset = 0;
+    //unsigned long long elapsed_ms;
+    
 
     if(monitoring_active)
     {
@@ -35,7 +37,7 @@ static ssize_t util_file_show(struct kobject *kobj, struct kobj_attribute *attr,
         }
 
         //Go through to see if the node is in there
-        lockScheduleLL();
+        
         while(loopedThread != NULL) {
             if(loopedThread->tid == extractTid)
             {
@@ -43,20 +45,24 @@ static ssize_t util_file_show(struct kobject *kobj, struct kobj_attribute *attr,
             }
             loopedThread = loopedThread->next;
         }
-        unlockScheduleLL();
+       
 
         if(loopedThread != NULL)
         {
-            elapsed_time = ktime_sub(ktime_get(), loopedThread->startTimer);
-            elapsed_ms = ktime_to_ms(elapsed_time);
+            //elapsed_time = ktime_sub(ktime_get(), loopedThread->startTimer);
+            //elapsed_ms = ktime_to_ms(elapsed_time);
         }
         else
         {
             return sprintf(buf, "Thread not found!\n");
         }
 
-
-        return sprintf(buf, "%llu %s\n",elapsed_ms, loopedThread->utilization);
+        offset = loopedThread->offset;
+        strncpy(buf, loopedThread->dataBuffer, loopedThread->offset);
+        memset(loopedThread->dataBuffer,0,BUFFER_SIZE);
+        loopedThread->offset = 0;
+        
+        return offset;
     }
     else
     {
@@ -87,7 +93,7 @@ int createThreadFile(struct threadNode *thread)
     }
     
     snprintf((char *)threadAtt->attr.name, 16, "%d", thread->tid);
-    printk(KERN_INFO "File name: %s\n", threadAtt->attr.name);
+    //printk(KERN_INFO "File name: %s\n", threadAtt->attr.name);
 
     // Set up the kobj_attribute fields
     threadAtt->attr.mode = 0664;
@@ -146,6 +152,7 @@ static ssize_t monitoring_control_store(struct kobject *kobj, struct kobj_attrib
     } else if (buf[0] == '0') {
         monitoring_active = false;
         // Stop data collection and cleanup
+        
     }
 
     mutex_unlock(&monitoring_lock);

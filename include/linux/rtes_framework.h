@@ -9,8 +9,9 @@
 #include <linux/hrtimer.h>
 #include <linux/kobject.h>
 
-
+#define BUFFER_SIZE    4096
 extern struct rtesThreadHead threadHead;
+extern bool monitoring_active;
 
 // Define the structure for linked list nodes
 struct threadNode {
@@ -26,6 +27,10 @@ struct threadNode {
     struct kobj_attribute *thread_obj; // Pointer to the kObject for the file
     ktime_t startTimer;
     char utilization[20];
+    unsigned long periodIncrement;
+    unsigned long costIncrement;
+    size_t offset;
+    char dataBuffer[BUFFER_SIZE];
     struct threadNode* next;	// Pointer to the next node
 };
 

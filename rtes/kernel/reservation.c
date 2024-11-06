@@ -29,10 +29,44 @@ void unlockScheduleLL() {
 }
 
 static enum hrtimer_restart restart_period(struct hrtimer *timer) {
+	char periodString[10];
+	char executeString[10];
+	char utilString[10];
+	int error;
+	ktime_t elapsed_time;
 	struct threadNode *task = container_of(timer, struct threadNode, high_res_timer);
 	hrtimer_forward_now(timer, task->periodDuration);
 	task->periodTime = 0;
 	task->prev_schedule = hrtimer_get_remaining(timer);
+	//task->periodIncrement += ktime_to_ms(task->periodDurlation);
+	//task->costIncrement += ktime_to_us(timespec_to_ktime(task->C));
+
+	if(monitoring_active)
+	{
+		//lockScheduleLL();
+		//sprintf(periodString, "%lu", task->periodIncrement);
+		//sprintf(executeString, "%lu", task->costIncrement);
+
+		//rror = sys_calc(executeString,periodString,'/',utilString);
+		//if (error != 0) {
+       // 	printk(KERN_ERR "sys_calc failed with error: %d\n", error);
+        	
+    	//}
+
+		elapsed_time = ktime_sub(ktime_get(), task->startTimer);
+		task->offset += sprintf(task->dataBuffer+task->offset,"%llu %s\n",ktime_to_ms(elapsed_time),task->utilization);
+
+		printk(KERN_INFO "offset increased: %d\n", task->offset);
+		printk(KERN_INFO "Time passed: %llu\n", ktime_to_ms(elapsed_time));
+		printk(KERN_INFO "Utilization: %s\n", task->dataBuffer);
+		//unlockScheduleLL();
+	}
+	else
+	{
+
+		memset(task->dataBuffer,0,BUFFER_SIZE);
+		task->offset = 0;
+	}
 	return HRTIMER_RESTART;
 }
 
@@ -121,6 +155,7 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 		lookThread->periodDuration = timespec_to_ktime(t);
 		lookThread->cost_us = ktime_to_us(timespec_to_ktime(c));
 		lookThread->periodTime = 0;
+		hrtimer_start(&lookThread->high_res_timer, lookThread->periodDuration, HRTIMER_MODE_ABS);
 
 		printk(KERN_INFO "Updated existing thread!\n");
 	}
@@ -143,13 +178,14 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 		hrtimer_init(&new_node->high_res_timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
 		new_node->high_res_timer.function = &restart_period;
 		new_node->startTimer = ktime_get();
+		hrtimer_start(&new_node->high_res_timer, new_node->periodDuration, HRTIMER_MODE_ABS);
 		
 		//comvert to string
 		sprintf(periodString, "%llu", ktime_to_ms(new_node->periodDuration));
 		sprintf(executeString, "%llu", ktime_to_ms(timespec_to_ktime(c)));
 
-		printk(KERN_INFO "Period is: %s\n", periodString);
-		printk(KERN_INFO "executeString is: %s\n", executeString);
+		//printk(KERN_INFO "Period is: %s\n", periodString);
+		//printk(KERN_INFO "executeString is: %s\n", executeString);
 
 		//Calculate the 
 		ret = sys_calc(executeString,periodString,'/',calcResult);
@@ -220,7 +256,7 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 
 SYSCALL_DEFINE1(cancel_reserve, pid_t, tid) 
 {
-	int output;
+	int output = -1;
 
 	// If tid is 0, use current thread's pid
 	if (tid == 0) {
@@ -229,56 +265,56 @@ SYSCALL_DEFINE1(cancel_reserve, pid_t, tid)
 
 	lockScheduleLL();
 	output = removeThreadInScheduleLL(tid);
-	//amountReserved--;
+	amountReserved--;
 
-	// if(amountReserved == 0)
-	// {
-	// 	printk(KERN_INFO "Empty Linked List!\n");
-	// }
-	// else
-	// {
-	// 	if(amountReserved >= 1)
-	// 	{
-	// 		struct threadNode *loopedThread = threadHead.head;
-	// 		printk(KERN_INFO "amount reserved is %d\n", amountReserved);
-	// 		printk(KERN_INFO "Thread ID: %lld, CPU ID: %lld, Period Duration: %llu, Cost: %llu\n",
-	// 				(long long)loopedThread->tid,
-	// 				(long long)loopedThread->cpuid,
-	// 				(unsigned long long)ktime_to_us(loopedThread->periodDuration),
-	// 				(unsigned long long)loopedThread->cost_us);
+	if(amountReserved == 0)
+	{
+		printk(KERN_INFO "Empty Linked List!\n");
+	}
+	else
+	{
+		if(amountReserved >= 1)
+		{
+			struct threadNode *loopedThread = threadHead.head;
+			printk(KERN_INFO "amount reserved is %d\n", amountReserved);
+			printk(KERN_INFO "Thread ID: %lld, CPU ID: %lld, Period Duration: %llu, Cost: %llu\n",
+					(long long)loopedThread->tid,
+					(long long)loopedThread->cpuid,
+					(unsigned long long)ktime_to_us(loopedThread->periodDuration),
+					(unsigned long long)loopedThread->cost_us);
 
-	// 	}
-	// 	if(amountReserved >= 2)
-	// 	{
-	// 		struct threadNode *loopedThread = threadHead.head->next;
-	// 		printk(KERN_INFO "amount reserved is %d", amountReserved);
-	// 		printk(KERN_INFO "Thread ID: %lld, CPU ID: %lld, Period Duration: %llu, Cost: %llu\n",
-	// 				(long long)loopedThread->tid,
-	// 				(long long)loopedThread->cpuid,
-	// 				(unsigned long long)ktime_to_us(loopedThread->periodDuration),
-	// 				(unsigned long long)loopedThread->cost_us);
-	// 	}
-	// 	if(amountReserved >= 3)
-	// 	{
-	// 		struct threadNode *loopedThread = threadHead.head->next->next;
-	// 		printk(KERN_INFO "amount reserved is %d\n", amountReserved);
-	// 		printk(KERN_INFO "Thread ID: %lld, CPU ID: %lld, Period Duration: %llu, Cost: %llu\n",
-	// 				(long long)loopedThread->tid,
-	// 				(long long)loopedThread->cpuid,
-	// 				(unsigned long long)ktime_to_us(loopedThread->periodDuration),
-	// 				(unsigned long long)loopedThread->cost_us);
-	// 	}
-	// 	if(amountReserved >= 4)
-	// 	{
-	// 		struct threadNode *loopedThread = threadHead.head->next->next->next;
-	// 		printk(KERN_INFO "amount reserved is %d\n", amountReserved);
-	// 		printk(KERN_INFO "Thread ID: %lld, CPU ID: %lld, Period Duration: %llu, Cost: %llu\n",
-	// 				(long long)loopedThread->tid,
-	// 				(long long)loopedThread->cpuid,
-	// 				(unsigned long long)ktime_to_us(loopedThread->periodDuration),
-	// 				(unsigned long long)loopedThread->cost_us);
-	// 	}
-	//}
+		}
+		if(amountReserved >= 2)
+		{
+			struct threadNode *loopedThread = threadHead.head->next;
+			printk(KERN_INFO "amount reserved is %d", amountReserved);
+			printk(KERN_INFO "Thread ID: %lld, CPU ID: %lld, Period Duration: %llu, Cost: %llu\n",
+					(long long)loopedThread->tid,
+					(long long)loopedThread->cpuid,
+					(unsigned long long)ktime_to_us(loopedThread->periodDuration),
+					(unsigned long long)loopedThread->cost_us);
+		}
+		if(amountReserved >= 3)
+		{
+			struct threadNode *loopedThread = threadHead.head->next->next;
+			printk(KERN_INFO "amount reserved is %d\n", amountReserved);
+			printk(KERN_INFO "Thread ID: %lld, CPU ID: %lld, Period Duration: %llu, Cost: %llu\n",
+					(long long)loopedThread->tid,
+					(long long)loopedThread->cpuid,
+					(unsigned long long)ktime_to_us(loopedThread->periodDuration),
+					(unsigned long long)loopedThread->cost_us);
+		}
+		if(amountReserved >= 4)
+		{
+			struct threadNode *loopedThread = threadHead.head->next->next->next;
+			printk(KERN_INFO "amount reserved is %d\n", amountReserved);
+			printk(KERN_INFO "Thread ID: %lld, CPU ID: %lld, Period Duration: %llu, Cost: %llu\n",
+					(long long)loopedThread->tid,
+					(long long)loopedThread->cpuid,
+					(unsigned long long)ktime_to_us(loopedThread->periodDuration),
+					(unsigned long long)loopedThread->cost_us);
+		}
+	}
 	unlockScheduleLL();
 
 	
@@ -320,13 +356,13 @@ int removeThreadInScheduleLL(pid_t tid) {
 			}
 
 			kfree(loopedThread);
+			loopedThread = NULL;
 			return 0;
 		}
 
 		prev = loopedThread;
 		loopedThread = loopedThread->next;
 	}
-
-
+	
 	return -1;
 }
