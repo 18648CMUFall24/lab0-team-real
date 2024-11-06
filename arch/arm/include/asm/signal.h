@@ -23,7 +23,7 @@ typedef struct {
 #else
 /* Here we must cater to libcs that poke about in kernel headers.  */
 
-#define NSIG		32
+#define NSIG		33
 typedef unsigned long sigset_t;
 
 #endif /* __KERNEL__ */
@@ -71,6 +71,7 @@ typedef unsigned long sigset_t;
 #define SIGRTMAX	_NSIG
 
 #define SIGSWI		32
+#define	SIGEXCESS	33
 
 /*
  * SA_FLAGS values:

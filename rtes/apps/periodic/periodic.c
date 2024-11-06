@@ -8,9 +8,15 @@
 #include <stdint.h>
 #include <sys/syscall.h>
 #include <sys/time.h>
+#include <signal.h>
 
 const uint64_t CLOCKS_PER_MSEC = (uint64_t)CLOCKS_PER_SEC / 1000;
 const uint64_t CLOCKS_PER_NSEC = (uint64_t)CLOCKS_PER_SEC / 1000000000;
+
+void handle_sigexcess() {
+    printf("SIGEXCESS recieved\n");
+    exit(-1);
+}
 
 void increment_by_period(struct timeval *time, uint64_t period_s, int64_t period_us) {
     time->tv_sec += period_s;
@@ -62,10 +68,12 @@ int main(int argc, char *argv[]) {
     uint64_t clocks_running = cArg * CLOCKS_PER_MSEC;
     time_t period_s = tArg / 1000;
     suseconds_t period_us = (tArg % 1000) * 1000;
+    signal(SIGEXCESS, handle_sigexcess);
 
-    printf("Cost: %d ms (%lld clock cycles)\n", cArg, clocks_running);
-    printf("Period: %d ms (%d s %d us)\n", tArg, period_s, period_us);
-    printf("Core: %d\n", cpuArg);
+
+    // printf("Cost: %d ms (%lld clock cycles)\n", cArg, clocks_running);
+    // printf("Period: %d ms (%d s %d us)\n", tArg, period_s, period_us);
+    // printf("Core: %d\n", cpuArg);
 
 
     // Setting up CPU affinity using syscall for sched_setaffinity
@@ -82,16 +90,16 @@ int main(int argc, char *argv[]) {
         clock_t start = clock();
         clock_t clocks_periodElapsedTime = 0;
 
-        printf("Started period...");
-        fflush(stdout);
+        // printf("Started period...");
+        // fflush(stdout);
 
         //pretend to do busy work
-        while(clocks_running >= clocks_periodElapsedTime)
+        while(clocks_periodElapsedTime < clocks_running)
         {
             clocks_periodElapsedTime = (clock() - start);
         }
 
-        printf("Ended period %d\n", (clock() / CLOCKS_PER_SEC));
+        // printf("Ended period %d\n", (clock() / CLOCKS_PER_SEC));
 
         if (set_sleep_duration(&sleep_time, &next_wakeup) < 0) {
             printf("Overran period\n");
