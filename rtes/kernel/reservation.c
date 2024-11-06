@@ -153,6 +153,23 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 		lookThread->periodTime = 0;
 		hrtimer_start(&lookThread->high_res_timer, lookThread->periodDuration, HRTIMER_MODE_ABS);
 
+		//converting to string
+		sprintf(periodString, "%llu", ktime_to_ms(lookThread->periodDuration));
+		sprintf(executeString, "%llu", ktime_to_ms(timespec_to_ktime(c)));
+
+		//Calculate the utilization
+		ret = sys_calc(executeString,periodString,'/',calcResult);
+		if (ret != 0) {
+        	printk(KERN_ERR "sys_calc failed with error: %d\n", ret);
+        	
+    	}
+		else
+		{
+			strncpy(lookThread->utilization, calcResult, sizeof(lookThread->utilization));
+
+		}
+		
+		printk(KERN_INFO "Utilization is: %s\n", lookThread->utilization);
 		printk(KERN_INFO "Updated existing thread!\n");
 	}
 	else
@@ -189,8 +206,11 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
         	printk(KERN_ERR "sys_calc failed with error: %d\n", ret);
         	
     	}
+		else
+		{
+			strncpy(new_node->utilization, calcResult, sizeof(new_node->utilization));
+		}
 
-		strncpy(new_node->utilization, calcResult, sizeof(new_node->utilization));
 		printk(KERN_INFO "Utilization is: %s\n", new_node->utilization);
 
 
