@@ -241,6 +241,8 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 		node->periodTime = 0;
 		node->prev_schedule = 0;
 		node->actively_running = false;
+		memset(node->dataBuffer,0,BUFFER_SIZE);
+        node->offset = 0;
 
 		//converting to string
 		sprintf(periodString, "%llu", ktime_to_ms(node->periodDuration));
