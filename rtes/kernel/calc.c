@@ -202,33 +202,17 @@ SYSCALL_DEFINE4(calc,
 		char*, result) {
 	s64 p1, p2, output;
 
-	if (result == NULL) 
-	{
-		printk(KERN_INFO "Output is bad before calculation!\n");
-		return EINVAL;
-	}
+	if (result == NULL) return EINVAL;
 	// Need a check that result_buf is long enough? 
 
 	p1 = parse_param(param1);
-	if (p1 < 0)
-	{
-		printk(KERN_INFO "P1 is wrong parameter!\n");
-		return EINVAL;
-	}
+	if (p1 < 0) return EINVAL;
 
 	p2 = parse_param(param2);
-	if (p2 < 0)
-	{
-		printk(KERN_INFO "P2 is wrong parameter!\n");
-		return EINVAL;
-	}
+	if (p2 < 0) return EINVAL;
 
 	output = do_calc(p1, p2, operation);
-	if (output == -EINVAL) {
-		
-		printk(KERN_INFO "Output is bad after calculation!\n");
-		return EINVAL;
-	} else if (output < 0) {
+	if (output < 0) {
 		print_negative(result, output);
 	} else {
 		write_result(result, output);
@@ -248,7 +232,7 @@ int structured_calc(
 
 	p1 = parse_calc_data(param1);
 	if (p1 < 0) return EINVAL;
-	p2 = parse_calc_data(param1);
+	p2 = parse_calc_data(param2);
 	if (p2 < 0) return EINVAL;
 
 	output = do_calc(p1, p2, operation);
