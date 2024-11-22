@@ -35,14 +35,12 @@ void unlockScheduleLL(void) {
 static enum hrtimer_restart restart_period(struct hrtimer *timer) {
 	struct timespec cur;
 	ktime_t elapsed_time;
-	struct threadNode *task = container_of(timer, struct threadNode, high_res_timer);
-	char periodString[10];
-	char executeString[10];
-	char calcResult[10] = {};
+	struct threadNode *task = container_of(timer, struct threadNode, period_timer);
+	struct calc_data cost, period, util;
 	int ret;
 
 	hrtimer_forward_now(timer, task->periodDuration);
-	
+
 
 	getrawmonotonic(&cur);
 	task->prev_schedule = timespec_to_ns(&cur);
@@ -51,50 +49,31 @@ static enum hrtimer_restart restart_period(struct hrtimer *timer) {
 	energyCalc(task);
 
 
-	if(monitoring_active)
-	{
+	if(monitoring_active) {
+		do {
+			elapsed_time = ktime_sub(ktime_get(), task->startTimer);
 
-		elapsed_time = ktime_sub(ktime_get(), task->startTimer);
+			//converting to string
+			cost.whole = (u16) ktime_to_ms(task->costDuration);
+			cost.decimal = 0;
+			period.whole = (u16) ktime_to_ms(task->periodDuration);
+			period.decimal = 0;
 
-		//converting to string
-		sprintf(periodString, "%llu", div64_u64(ktime_to_ns(task->periodDuration),1000000));
-		sprintf(executeString, "%llu",div64_u64(task->periodTime,1000000));
-		printk(KERN_INFO "Period is: %s\n", periodString);
-		printk(KERN_INFO "Cost is: %s\n", executeString);
+			//Calculate the utilization
+			ret = structured_calc(cost, period, '/', &util);
+			if (ret != 0) {
+				printk(KERN_ERR "sys_calc failed with error: %d\n", ret);
+				break;
+			}
 
-		//Calculate the utilization
-		ret = sys_calc(executeString,periodString,'/',calcResult);
-		printk(KERN_INFO "calculated utilization is: %s\n", calcResult);
+			if(BUFFER_SIZE - task->offset > 20) {
+				task->offset += sprintf(task->dataBuffer+task->offset,"%llu %s\n",ktime_to_ms(elapsed_time),task->utilization);
+			} else {
+				printk(KERN_INFO "Buffer full with offset: %d\n", task->offset);
+			}
 
-		if (ret != 0) {
-        	printk(KERN_ERR "sys_calc failed with error: %d\n", ret);
-		}
-		else
-		{
+		} while (0);
 
-			strncpy(task->utilization, calcResult, sizeof(task->utilization));
-
-		}
-
-
-
-		if(BUFFER_SIZE - task->offset < 20)
-		{
-			printk(KERN_INFO "Buffer full with offset: %d\n", task->offset);
-		}
-		else
-		{
-			task->offset += sprintf(task->dataBuffer+task->offset,"%llu %s\n",ktime_to_ms(elapsed_time),task->utilization);
-
-			printk(KERN_INFO "offset increased: %d\n", task->offset);
-			printk(KERN_INFO "Time passed: %llu\n", ktime_to_ms(elapsed_time));
-			//printk(KERN_INFO "Utilization: %s\n", task->dataBuffer);
-		}
-
-	}
-	else
-	{
-		//Do Nothing
 	}
 
 	task->periodTime = 0;
@@ -123,7 +102,7 @@ void rtesDescheduleTask(struct task_struct *task) {
 		// Send SIGEXCESS if overran period
 		if (node->periodTime > node->cost_ns) {
 			printk(KERN_DEBUG "Task %d exceeded scheduled computation time (%lld). Has run for %lld ns",
-				  node->tid, node->cost_ns, node->periodTime);
+			  node->tid, node->cost_ns, node->periodTime);
 
 			memset(&info, 0, sizeof(siginfo_t));
 			info.si_signo = SIGEXCESS;
@@ -226,8 +205,8 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 				break;
 			}
 
-			hrtimer_init(&node->high_res_timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
-			node->high_res_timer.function = restart_period;
+			hrtimer_init(&node->period_timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
+			node->period_timer.function = restart_period;
 			node->next = threadHead.head;
 			threadHead.head = node;
 			amountReserved++;
@@ -255,10 +234,10 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 		//Calculate the utilization
 		ret = sys_calc(executeString,periodString,'/',calcResult);
 		if (ret != 0) {
-        	printk(KERN_ERR "sys_calc failed with error: %d\n", ret);
+			printk(KERN_ERR "sys_calc failed with error: %d\n", ret);
 		}
 		else
-		{
+	{
 			strncpy(node->utilization, calcResult, sizeof(node->utilization));
 
 		}
@@ -272,7 +251,7 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 		}
 
 		//start the timer
-		hrtimer_start(&node->high_res_timer, node->periodDuration, HRTIMER_MODE_ABS);
+		hrtimer_start(&node->period_timer, node->periodDuration, HRTIMER_MODE_ABS);
 
 	} while (0);
 	debugPrints();
@@ -327,12 +306,12 @@ int removeThreadInScheduleLL(pid_t tid) {
 			} else {
 				prev->next = loopedThread->next;
 			}
-			
+
 			//remove the thread file utilization 
 			removeThreadFile(loopedThread);
-			
+
 			//cancel timer
-			hrtimer_cancel(&loopedThread->high_res_timer);
+			hrtimer_cancel(&loopedThread->period_timer);
 			kfree(loopedThread);
 			amountReserved--;
 			return 0;
@@ -357,12 +336,12 @@ void debugPrints() {
 
 	while (loopedThread != NULL) {
 		printk(KERN_NOTICE "[%px] Thread ID: %lld, CPU ID: %lld, Period Duration: %llu, Cost: %llu\n", 
-			 (void *) loopedThread,
-			 (long long)loopedThread->tid, 
-			 (long long)loopedThread->cpuid, 
-			 (unsigned long long)ktime_to_us(loopedThread->periodDuration), 
-			 (unsigned long long)loopedThread->cost_ns
-		);
+	 (void *) loopedThread,
+	 (long long)loopedThread->tid, 
+	 (long long)loopedThread->cpuid, 
+	 (unsigned long long)ktime_to_us(loopedThread->periodDuration), 
+	 (unsigned long long)loopedThread->cost_ns
+	 );
 
 		loopedThread = loopedThread->next;
 	}
