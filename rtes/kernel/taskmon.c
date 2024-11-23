@@ -11,7 +11,7 @@ static struct kobject *taskmon_kobj;
 bool monitoring_active = false;
 static DEFINE_MUTEX(monitoring_lock);
 
-static struct kobject *rtes_kobject;
+struct kobject *rtes_kobject;
 static struct kobject *taskmon_kobject;
 static struct kobject *util_kobject;
 
@@ -204,7 +204,11 @@ static int __init taskmon_init(void) {
         return error;
     }
 
-    printk(KERN_INFO "Task Monitor sysfs interface initialized at /sys/rtes/taskmon.\n");
+    //Initilizing the reservation status sysfs
+    reservationStatus_init();
+
+    printk(KERN_INFO "sysfs files created at /sys/rtes/.\n");
+
     return 0;
 }
 
@@ -212,7 +216,13 @@ static int __init taskmon_init(void) {
 // Cleanup sysfs entry on shutdown
 static void __exit taskmon_exit(void) {
 
+    //delete the taskmonitor file
     sysfs_remove_file(taskmon_kobj, &monitoring_control_attr.attr);
+
+    //delete the reservation status exit
+    reservationStatus_exit();
+
+    //delete the directory
     kobject_put(taskmon_kobj);
     kobject_put(rtes_kobject);
     printk(KERN_INFO "Task Monitor sysfs interface unitialzed and deleted at /sys/rtes/taskmon.\n");

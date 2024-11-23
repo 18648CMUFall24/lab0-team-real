@@ -13,6 +13,7 @@
 #define BUFFER_SIZE    4096
 extern  struct rtesThreadHead threadHead;
 extern bool monitoring_active;
+extern struct kobject *rtes_kobject;
 
 
 // Define the structure for linked list nodes
@@ -42,7 +43,8 @@ struct rtesThreadHead {
 };
 
 
-
+void reservationStatus_init(void);
+void reservationStatus_exit(void);
 void lockScheduleLL(void);
 void unlockScheduleLL(void);
 void rtesScheduleTask(struct task_struct *task);
