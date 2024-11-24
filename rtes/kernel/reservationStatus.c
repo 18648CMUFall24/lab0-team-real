@@ -63,12 +63,16 @@ void reservationStatus_init(void)
 {
 
     int error = 0;
-    error = sysfs_create_file(rtes_kobject, &reservationStatus_attribute.attr);
-    if(error)
-    {
-        printk(KERN_INFO "Unable to create the reservation status file!\n"); 
-    }
 
+    //make sure the rtes directory exist!
+    if(rtes_kobject != NULL)
+    {
+        error = sysfs_create_file(rtes_kobject, &reservationStatus_attribute.attr);
+        if(error)
+        {
+            printk(KERN_INFO "Unable to create the reservation status file!\n"); 
+        }
+    }
 }
 
 
