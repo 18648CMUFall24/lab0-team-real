@@ -18,6 +18,7 @@ static ssize_t reservationStatus_show(struct kobject *kobj, struct kobj_attribut
 
     if(loopedThread != NULL)
     {
+        lockScheduleLL();
         len += sprintf(buf + len, "TID\tPID\tPRIO\tCPU\tNAME \n");
         while(loopedThread != NULL)
         {
@@ -44,7 +45,7 @@ static ssize_t reservationStatus_show(struct kobject *kobj, struct kobj_attribut
             rcu_read_unlock();
             loopedThread = loopedThread->next;
         }
-
+        unlockScheduleLL();
         return len;
     }
     else
