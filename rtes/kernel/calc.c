@@ -212,7 +212,9 @@ SYSCALL_DEFINE4(calc,
 	if (p2 < 0) return EINVAL;
 
 	output = do_calc(p1, p2, operation);
-	if (output < 0) {
+	if (output == -EINVAL) {
+		return EINVAL;
+	} else if (output < 0) {
 		print_negative(result, output);
 	} else {
 		write_result(result, output);

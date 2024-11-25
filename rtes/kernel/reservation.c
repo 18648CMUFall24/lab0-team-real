@@ -15,24 +15,26 @@
 
 static size_t amountReserved;
 struct rtesThreadHead threadHead;
-static bool head_was_init;
+// static bool head_was_init;
 
 void debugPrints(void);
 
-void threadHead_init(void) {
+void __init threadHead_init(void) {
 	threadHead.head = NULL;
 	spin_lock_init(&threadHead.mutex);
-	head_was_init = true;
+	// head_was_init = true;
 	threadHead.need_housekeeping = false;
 	amountReserved = 0;
 }
 
 void lockScheduleLL() {
-	if (head_was_init) spin_lock_irqsave(&threadHead.mutex, threadHead.flags);
+	// if (head_was_init) 
+	spin_lock_irqsave(&threadHead.mutex, threadHead.flags);
 }
 
 void unlockScheduleLL() {
-	if (head_was_init) spin_unlock_irqrestore(&threadHead.mutex, threadHead.flags);
+	// if (head_was_init) 
+	spin_unlock_irqrestore(&threadHead.mutex, threadHead.flags);
 }
 
 void pause_timer(struct threadNode *task) {
@@ -168,7 +170,7 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 		return EINVAL;
 	}
 
-	if (!head_was_init) { threadHead_init(); }
+	// if (!head_was_init) { threadHead_init(); }
 
 	if (tid == 0) { tid = current->pid; }
 
@@ -209,7 +211,7 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 
 	// Calculate the utilization
 	ret = structured_calc(cost, period, '/', &util);
-	if (ret != 0 || util.negative || util.whole > 0) {
+	if (ret != 0 || util.negative || (util.whole == 1 && util.decimal != 0) || util.whole > 1) {
 		printk(KERN_ERR "calc failed with error: %d\n", ret);
 		printk(KERN_ERR "Util = %c%d.%d", util.negative ? '-':' ', util.whole, util.decimal);
 		return -EINVAL;
