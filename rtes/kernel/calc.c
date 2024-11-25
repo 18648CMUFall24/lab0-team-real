@@ -219,7 +219,7 @@ int structured_calc(
 
 	p1 = parse_calc_data(param1);
 	if (p1 < 0) return EINVAL;
-	p2 = parse_calc_data(param1);
+	p2 = parse_calc_data(param2);
 	if (p2 < 0) return EINVAL;
 
 	output = do_calc(p1, p2, operation);

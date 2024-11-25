@@ -11,7 +11,7 @@
 #include <linux/kobject.h>
 
 #define BUFFER_SIZE    4096
-extern  struct rtesThreadHead threadHead;
+// extern  struct rtesThreadHead threadHead;
 extern bool monitoring_active;
 
 struct calc_data {
@@ -60,6 +60,11 @@ struct rtesThreadHead {
 
 
 
+
+bool rtes_head_is_init(void);
+bool rtes_needs_housekeeping(void);
+void rtes_done_housekeeping(void);
+struct threadNode *getFirstThreadNode(void);
 void lockScheduleLL(void);
 void unlockScheduleLL(void);
 void rtesScheduleTask(struct task_struct *task);

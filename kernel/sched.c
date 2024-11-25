@@ -4256,32 +4256,47 @@ pick_next_task(struct rq *rq)
 }
 
 void handle_rt_task_state_updates() {
-	struct threadNode *loopedThread = threadHead.head;
+	struct threadNode *loopedThread;
 	struct rq *rq;
 	unsigned long rq_flags;
-	if (!threadHead.need_housekeeping) return;
+
+	if (!rtes_head_is_init()) return;
+	if (!rtes_needs_housekeeping()) return;
+
+	printk(KERN_ERR "RTES: Attempting to do updates on a task!");
 	lockScheduleLL();
+	printk(KERN_ERR "RTES: A");
+	loopedThread = getFirstThreadNode();
+	printk(KERN_ERR "RTES: B");
 	while(loopedThread != NULL) {
-		switch(loopedThread->state) {
-			case MAKE_SUSPEND:
-				rq = task_rq_lock(loopedThread->task, &rq_flags);
-				deactivate_task(rq, loopedThread->task, TASK_UNINTERRUPTIBLE);
-				task_rq_unlock(rq, loopedThread->task, &rq_flags);
-				loopedThread->state = SUSPENDED;
-				break;
-			case MAKE_RUNNABLE:
-				wake_up_process(loopedThread->task);
-				loopedThread->state = RUNNABLE;
-				break;
-			default:
-				break;
+		if (loopedThread->task != NULL) {
+			switch(loopedThread->state) {
+				case MAKE_SUSPEND:
+					printk(KERN_ERR "RTES: C (%p)", loopedThread->task);
+					rq = task_rq_lock(loopedThread->task, &rq_flags);
+					printk(KERN_ERR "RTES: D");
+					deactivate_task(rq, loopedThread->task, TASK_UNINTERRUPTIBLE);
+					printk(KERN_ERR "RTES: E");
+					task_rq_unlock(rq, loopedThread->task, &rq_flags);
+					printk(KERN_ERR "RTES: F");
+					loopedThread->state = SUSPENDED;
+					break;
+				case MAKE_RUNNABLE:
+					printk(KERN_ERR "RTES: G (%p)", loopedThread->task);
+					wake_up_process(loopedThread->task);
+					printk(KERN_ERR "RTES: H");
+					loopedThread->state = RUNNABLE;
+					break;
+				default:
+					break;
+			}
 		}
 
 		loopedThread = loopedThread->next;
 	}
 
+	rtes_done_housekeeping();
 	unlockScheduleLL();
-	threadHead.need_housekeeping = false;
 }
 
 /*
