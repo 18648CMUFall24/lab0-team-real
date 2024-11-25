@@ -210,13 +210,17 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 	period.negative = false;
 
 	// Calculate the utilization
+	printk(KERN_INFO "Cost = %c%d.%d", 
+		cost.negative ? '-':' ', cost.whole, cost.decimal);
+	printk(KERN_INFO "Period = %c%d.%d", 
+		period.negative ? '-':' ', period.whole, period.decimal);
 	ret = structured_calc(cost, period, '/', &util);
 	if (ret != 0 || util.negative || (util.whole == 1 && util.decimal != 0) || util.whole > 1) {
 		printk(KERN_ERR "calc failed with error: %d\n", ret);
 		printk(KERN_ERR "Util = %c%d.%d", util.negative ? '-':' ', util.whole, util.decimal);
 		return -EINVAL;
 	}
-	printk(KERN_INFO "Worst case utilization is: 0.%d\n", util.decimal);
+	printk(KERN_INFO "Worst case utilization is: %d.%d\n", util.whole, util.decimal);
 
 	lockScheduleLL();
 	do {
@@ -344,12 +348,12 @@ void debugPrints() {
 
 	while (loopedThread != NULL) {
 		printk(KERN_NOTICE "[%px] Thread ID: %lld, CPU ID: %lld, Period Duration: %llu, Cost: %llu\n", 
-	 (void *) loopedThread,
-	 (long long)loopedThread->tid, 
-	 (long long)loopedThread->cpuid, 
-	 (unsigned long long)ktime_to_us(loopedThread->periodDuration), 
-	 (unsigned long long)loopedThread->cost_ns
-	 );
+		 (void *) loopedThread,
+		 (long long)loopedThread->tid, 
+		 (long long)loopedThread->cpuid, 
+		 (unsigned long long)ktime_to_us(loopedThread->periodDuration), 
+		 (unsigned long long)loopedThread->cost_ns
+		 );
 
 		loopedThread = loopedThread->next;
 	}
