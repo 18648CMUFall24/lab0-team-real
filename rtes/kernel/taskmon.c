@@ -19,21 +19,22 @@ static struct kobject *util_kobject;
 static ssize_t util_file_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf) 
 {
     int extractTid;
-    struct threadNode *loopedThread = threadHead.head;
+    struct threadNode *loopedThread = NULL;
     int ret = kstrtoint(attr->attr.name, 10, &extractTid);
     size_t offset = 0;
     size_t count = 0;
 
+    if (ret != 0) {
+        printk(KERN_ERR "Failed to convert attr name to integer, error: %d\n", ret);
+        return count; // Return the error code if conversion fails
+    }
     
     lockScheduleLL();
     
-   
-    if (ret != 0) {
-        printk(KERN_ERR "Failed to convert attr name to integer, error: %d\n", ret);
-        unlockScheduleLL();
-        return count; // Return the error code if conversion fails
-    }
 
+    loopedThread = findThreadInScheduleLL(extractTid);
+
+    /*
     //Go through to see if the node is in there
     while(loopedThread != NULL) {
         if(loopedThread->tid == extractTid)
@@ -42,22 +43,17 @@ static ssize_t util_file_show(struct kobject *kobj, struct kobj_attribute *attr,
         }
         loopedThread = loopedThread->next;
     }
+    */
        
 
-    if(loopedThread != NULL)
-    {
-        //Do Nothing
-    }
-    else
-    {
+    if(loopedThread == NULL) {
         unlockScheduleLL();
         return sprintf(buf, "Thread not found!\n");
     }
 
 
     //check to see if there is data to read
-    if(loopedThread->offset > 0)
-    {
+    if(loopedThread->offset > 0) {
         offset = loopedThread->offset;
         strncpy(buf, loopedThread->dataBuffer, loopedThread->offset);
         memset(loopedThread->dataBuffer,0,BUFFER_SIZE);
@@ -65,9 +61,7 @@ static ssize_t util_file_show(struct kobject *kobj, struct kobj_attribute *attr,
         
         unlockScheduleLL();
         return offset;
-    }
-    else
-    {
+    } else {
         unlockScheduleLL();
         return sprintf(buf, "No Data to read!\n");
     }
