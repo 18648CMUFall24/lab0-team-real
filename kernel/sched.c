@@ -4255,6 +4255,35 @@ pick_next_task(struct rq *rq)
 	BUG(); /* the idle class will always have a runnable task */
 }
 
+void handle_rt_task_state_updates() {
+	struct threadNode *loopedThread = threadHead.head;
+	struct rq *rq;
+	unsigned long rq_flags;
+	if (!threadHead.need_housekeeping) return;
+	lockScheduleLL();
+	while(loopedThread != NULL) {
+		switch(loopedThread->state) {
+			case MAKE_SUSPEND:
+				rq = task_rq_lock(loopedThread->task, &rq_flags);
+				deactivate_task(rq, loopedThread->task, TASK_UNINTERRUPTIBLE);
+				task_rq_unlock(rq, loopedThread->task, &rq_flags);
+				loopedThread->state = SUSPENDED;
+				break;
+			case MAKE_RUNNABLE:
+				wake_up_process(loopedThread->task);
+				loopedThread->state = RUNNABLE;
+				break;
+			default:
+				break;
+		}
+
+		loopedThread = loopedThread->next;
+	}
+
+	unlockScheduleLL();
+	threadHead.need_housekeeping = false;
+}
+
 /*
  * __schedule() is the main scheduler function.
  */
@@ -4318,6 +4347,7 @@ need_resched:
 		rq->curr = next;
 		++*switch_count;
 
+		handle_rt_task_state_updates();
 		rtesDescheduleTask(prev);
 		rtesScheduleTask(next);
 		context_switch(rq, prev, next); /* unlocks the rq */
