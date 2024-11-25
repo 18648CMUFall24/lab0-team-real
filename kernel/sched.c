@@ -4294,6 +4294,8 @@ static void __sched __schedule(void)
 	struct rq *rq;
 	int cpu;
 
+	handle_rt_task_state_updates();
+
 need_resched:
 	preempt_disable();
 	cpu = smp_processor_id();
@@ -4347,7 +4349,6 @@ need_resched:
 		rq->curr = next;
 		++*switch_count;
 
-		handle_rt_task_state_updates();
 		rtesDescheduleTask(prev);
 		rtesScheduleTask(next);
 		context_switch(rq, prev, next); /* unlocks the rq */
@@ -4367,6 +4368,7 @@ need_resched:
 	preempt_enable_no_resched();
 	if (need_resched())
 		goto need_resched;
+
 }
 
 static inline void sched_submit_work(struct task_struct *tsk)
