@@ -1,9 +1,11 @@
 #include <linux/kernel.h>
 #include <linux/rtes_framework.h>
 #include <linux/errno.h>
+#include <linux/interrupt.h>
 #include <linux/syscalls.h>
 #include <linux/uaccess.h>
 #include <linux/slab.h>
+#include <linux/sched.h>
 #include <linux/time.h>
 #include <linux/spinlock.h>
 #include <linux/signal.h>
@@ -21,120 +23,129 @@ void threadHead_init(void) {
 	threadHead.head = NULL;
 	spin_lock_init(&threadHead.mutex);
 	head_was_init = true;
+	threadHead.need_housekeeping = false;
 	amountReserved = 0;
 }
 
-void lockScheduleLL(void) {
+void lockScheduleLL() {
 	if (head_was_init) spin_lock_irqsave(&threadHead.mutex, threadHead.flags);
 }
 
-void unlockScheduleLL(void) {
+void unlockScheduleLL() {
 	if (head_was_init) spin_unlock_irqrestore(&threadHead.mutex, threadHead.flags);
 }
 
+void pause_timer(struct threadNode *task) {
+	task->period_remaining_time = hrtimer_get_remaining(&task->period_timer);
+	hrtimer_cancel(&task->period_timer);
+}
+
+void resume_timer(struct threadNode *task) {
+	hrtimer_start(&task->period_timer, task->period_remaining_time, HRTIMER_MODE_REL);
+}
+
+static enum hrtimer_restart end_of_reserved_time(struct hrtimer *timer) {
+	// siginfo_t info; // Do we need if enforcing period?
+	struct threadNode *task_node = container_of(timer, struct threadNode, cost_timer);
+	task_node->state = MAKE_SUSPEND;
+	threadHead.need_housekeeping = true;
+
+	// Send SIGEXCESS if overran period
+	// Do we still do this if we're enforcing period?
+	/*
+	printk(KERN_DEBUG "Task %d exceeded scheduled computation time (%lld). Has run for %lld ns",
+	  node->tid, node->cost_ns, node->periodTime);
+
+	memset(&info, 0, sizeof(siginfo_t));
+	info.si_signo = SIGEXCESS;
+	info.si_code = SI_KERNEL;
+	info.si_int = SIGEXCESS;
+
+	if(send_sig_info(SIGEXCESS, &info, task)) {
+		printk(KERN_ERR "Failed to send SIGEXCESS to thread %d", task->pid);
+	}
+	*/
+
+	set_tsk_need_resched(current);
+	return HRTIMER_NORESTART;
+}
+
 static enum hrtimer_restart restart_period(struct hrtimer *timer) {
-	struct timespec cur;
 	ktime_t elapsed_time;
-	struct threadNode *task = container_of(timer, struct threadNode, period_timer);
 	struct calc_data cost, period, util;
 	int ret;
-
-	hrtimer_forward_now(timer, task->periodDuration);
-
-
-	getrawmonotonic(&cur);
-	task->prev_schedule = timespec_to_ns(&cur);
+	struct threadNode *task = container_of(timer, struct threadNode, period_timer);
 
 	if(monitoring_active) {
 		do {
-			elapsed_time = ktime_sub(ktime_get(), task->startTimer);
+			elapsed_time = ktime_sub(task->periodDuration, task->period_remaining_time);
 
-			//converting to string
 			cost.whole = (u16) ktime_to_ms(task->costDuration);
 			cost.decimal = 0;
 			period.whole = (u16) ktime_to_ms(task->periodDuration);
 			period.decimal = 0;
 
-			//Calculate the utilization
+			// Calculate the utilization
 			ret = structured_calc(cost, period, '/', &util);
 			if (ret != 0) {
-				printk(KERN_ERR "sys_calc failed with error: %d\n", ret);
 				break;
 			}
 
 			if(BUFFER_SIZE - task->offset > 20) {
-				task->offset += sprintf(task->dataBuffer+task->offset,"%llu %s\n",ktime_to_ms(elapsed_time),task->utilization);
+				task->offset += sprintf(task->dataBuffer+task->offset,"%llu .%d\n", ktime_to_ms(elapsed_time), util.decimal);
 			} else {
 				printk(KERN_INFO "Buffer full with offset: %d\n", task->offset);
 			}
 
 		} while (0);
-
 	}
 
-	task->periodTime = 0;
+	task->period_remaining_time = task->periodDuration;
+	task->state = MAKE_RUNNABLE;
+	threadHead.need_housekeeping = true;
+
+	set_tsk_need_resched(current);
+
+	hrtimer_forward_now(timer, task->periodDuration);
+
 	return HRTIMER_RESTART;
 }
 
 void rtesDescheduleTask(struct task_struct *task) {
 	struct threadNode *node;
-	struct timespec cur;
-	siginfo_t info;
 
 	if (task == NULL) return;
 
 	lockScheduleLL();
-
 	do {
 		node = findThreadInScheduleLL(task->pid);
 		if (node == NULL) break;
+
 		if (!(node->actively_running)) break; // Don't double deschedule
-		if (node->prev_schedule == 0) break; // Start on a clean period
+		node->actively_running = false;
 
 		// Accumulate time running this period
-		getrawmonotonic(&cur);
-		node->periodTime += timespec_to_ns(&cur) - node->prev_schedule;
+		pause_timer(node);
 
-		// Send SIGEXCESS if overran period
-		if (node->periodTime > node->cost_ns) {
-			printk(KERN_DEBUG "Task %d exceeded scheduled computation time (%lld). Has run for %lld ns",
-			  node->tid, node->cost_ns, node->periodTime);
-
-			memset(&info, 0, sizeof(siginfo_t));
-			info.si_signo = SIGEXCESS;
-			info.si_code = SI_KERNEL;
-			info.si_int = SIGEXCESS;
-
-			if(send_sig_info(SIGEXCESS, &info, task)) {
-				printk(KERN_ERR "Failed to send SIGEXCESS to thread %d", task->pid);
-			}
-		}
-
-		node->actively_running = false;
 	} while (0);
-
 	unlockScheduleLL();
 }
 
 void  rtesScheduleTask(struct task_struct *task) {
 	struct threadNode *node;
-	struct timespec cur;
 
 	if (task == NULL) return;
 
 	lockScheduleLL();
-
 	do {
 		node = findThreadInScheduleLL(task->pid);
 		if (node == NULL) break;
+
 		if (node->actively_running) break; // Don't double schedule
-
-		getrawmonotonic(&cur);
-		node->prev_schedule = timespec_to_ns(&cur);
-
 		node->actively_running = true;
-	} while (0);
+		resume_timer(node);
 
+	} while (0);
 	unlockScheduleLL();
 }
 
@@ -144,26 +155,21 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 	struct threadNode *node;
 	struct timespec c,t;
 	struct cpumask cpumask;
-	char periodString[10];
-	char executeString[10];
-	char calcResult[10] = {};
+	struct calc_data cost, period, util;
 	int ret;
 	bool exists = false;
 
-	if(cpuid < 0 || cpuid > 3) {
+	if (cpuid < 0 || cpuid > 3) {
 		printk(KERN_INFO "CPU ID does not exist!\n");
 		return EINVAL;
 	}
 
-	if (!head_was_init) {
-		threadHead_init();
-	}
+	if (!head_was_init) { threadHead_init(); }
 
-	if(tid == 0) {
-		tid = current->pid;
-	}
+	if (tid == 0) { tid = current->pid; }
 
-	if (!access_ok(VERIFY_READ, C, sizeof(struct timespec)) || !access_ok(VERIFY_READ, T, sizeof(struct timespec))) {
+	if (!access_ok(VERIFY_READ, C, sizeof(struct timespec)) 
+		|| !access_ok(VERIFY_READ, T, sizeof(struct timespec))) {
 		printk(KERN_INFO "Invalid user space pointers!\n");
 		return -EFAULT;
 	}
@@ -174,7 +180,7 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 		return -EFAULT;
 	}
 
-	if(copy_from_user(&t, T, sizeof(struct timespec))) {
+	if (copy_from_user(&t, T, sizeof(struct timespec))) {
 		printk(KERN_INFO "Error in copying T!\n");
 		return -EFAULT;
 	}
@@ -189,6 +195,22 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 		return -1;
 	}
 
+	// converting to string
+	cost.whole = (u16) ktime_to_ms(timespec_to_ktime(c));
+	cost.decimal = 0;
+	cost.negative = false;
+	period.whole = (u16) ktime_to_ms(timespec_to_ktime(t));
+	period.decimal = 0;
+	period.negative = false;
+
+	// Calculate the utilization
+	ret = structured_calc(cost, period, '/', &util);
+	if (ret != 0 || util.negative || util.whole > 0) {
+		printk(KERN_ERR "calc failed with error: %d\n", ret);
+		printk(KERN_ERR "Util = %c%d.%d", util.negative ? '-':' ', util.whole, util.decimal);
+		return -EINVAL;
+	}
+	printk(KERN_INFO "Worst case utilization is: 0.%d\n", util.decimal);
 
 	lockScheduleLL();
 	do {
@@ -203,6 +225,8 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 
 			hrtimer_init(&node->period_timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
 			node->period_timer.function = restart_period;
+			hrtimer_init(&node->cost_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+			node->cost_timer.function = end_of_reserved_time;
 			node->next = threadHead.head;
 			threadHead.head = node;
 			amountReserved++;
@@ -217,36 +241,17 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 		node->cpuid = cpuid;
 		node->periodDuration = timespec_to_ktime(t);
 		node->cost_ns = timespec_to_ns(&c);
-		node->periodTime = 0;
-		node->prev_schedule = 0;
 		node->actively_running = false;
 		memset(node->dataBuffer,0,BUFFER_SIZE);
-        node->offset = 0;
+		node->offset = 0;
 
-		//converting to string
-		sprintf(periodString, "%llu", ktime_to_ms(node->periodDuration));
-		sprintf(executeString, "%llu", ktime_to_ms(timespec_to_ktime(c)));
 
-		//Calculate the utilization
-		ret = sys_calc(executeString,periodString,'/',calcResult);
-		if (ret != 0) {
-			printk(KERN_ERR "sys_calc failed with error: %d\n", ret);
-		}
-		else
-	{
-			strncpy(node->utilization, calcResult, sizeof(node->utilization));
-
-		}
-
-		printk(KERN_INFO "Utilization is: %s\n", node->utilization);
-
-		//Creating thread utilziation file if nodes is not already exist
-		if(!exists)
-		{
+		// Creating thread utilziation file if nodes is not already exist
+		if(!exists) {
 			createThreadFile(node);
 		}
 
-		//start the timer
+		// start the timer
 		hrtimer_start(&node->period_timer, node->periodDuration, HRTIMER_MODE_ABS);
 
 	} while (0);
@@ -306,7 +311,8 @@ int removeThreadInScheduleLL(pid_t tid) {
 			//remove the thread file utilization 
 			removeThreadFile(loopedThread);
 
-			//cancel timer
+			//cancel timers
+			hrtimer_cancel(&loopedThread->cost_timer);
 			hrtimer_cancel(&loopedThread->period_timer);
 			kfree(loopedThread);
 			amountReserved--;
