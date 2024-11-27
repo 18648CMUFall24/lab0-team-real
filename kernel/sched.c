@@ -4264,30 +4264,45 @@ void handle_rt_task_state_updates() {
 	if (!rtes_needs_housekeeping()) return;
 
 	lockScheduleLL();
+	printk(KERN_ERR "A");
 	loopedThread = getFirstThreadNode();
+	printk(KERN_ERR "B");
 	while(loopedThread != NULL) {
 		if (loopedThread->task != NULL) {
 			switch(loopedThread->state) {
 				case MAKE_SUSPEND:
+					printk(KERN_ERR "C");
 					rq = task_rq_lock(loopedThread->task, &rq_flags);
+					printk(KERN_ERR "D");
 					deactivate_task(rq, loopedThread->task, TASK_UNINTERRUPTIBLE);
+					printk(KERN_ERR "E");
 					task_rq_unlock(rq, loopedThread->task, &rq_flags);
+					printk(KERN_ERR "F");
 					loopedThread->state = SUSPENDED;
+					printk(KERN_ERR "G");
 					break;
 				case MAKE_RUNNABLE:
+					printk(KERN_ERR "H");
 					wake_up_process(loopedThread->task);
+					printk(KERN_ERR "I");
 					loopedThread->state = RUNNABLE;
+					printk(KERN_ERR "J");
 					break;
 				default:
 					break;
 			}
 		}
 
+		
+		printk(KERN_ERR "K");
 		loopedThread = loopedThread->next;
 	}
 
+	printk(KERN_ERR "L");
 	rtes_done_housekeeping();
+	printk(KERN_ERR "M");
 	unlockScheduleLL();
+	printk(KERN_ERR "N");
 }
 
 /*

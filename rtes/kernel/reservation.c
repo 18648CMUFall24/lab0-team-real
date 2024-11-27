@@ -44,13 +44,13 @@ struct threadNode *getFirstThreadNode() {
 }
 
 void lockScheduleLL() {
-	// if (head_was_init) 
-	spin_lock_irqsave(&threadHead.mutex, threadHead.flags);
+	if (head_was_init) 
+		spin_lock_irqsave(&threadHead.mutex, threadHead.flags);
 }
 
 void unlockScheduleLL() {
-	// if (head_was_init) 
-	spin_unlock_irqrestore(&threadHead.mutex, threadHead.flags);
+	if (head_was_init) 
+		spin_unlock_irqrestore(&threadHead.mutex, threadHead.flags);
 }
 
 void pause_timer(struct threadNode *task) {
@@ -126,10 +126,9 @@ static enum hrtimer_restart restart_period(struct hrtimer *timer) {
 	task->state = MAKE_RUNNABLE;
 	threadHead.need_housekeeping = true;
 
-	set_tsk_need_resched(current);
-
 	hrtimer_forward_now(timer, task->periodDuration);
 
+	set_tsk_need_resched(current);
 	return HRTIMER_RESTART;
 }
 
@@ -195,7 +194,10 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 		threadHead_init(); 
 	}
 
-	if (tid == 0) { tid = current->pid; }
+	if (tid == 0) { 
+		tid = current->pid; 
+		task = current;
+	}
 
 	if (!access_ok(VERIFY_READ, C, sizeof(struct timespec)) 
 		|| !access_ok(VERIFY_READ, T, sizeof(struct timespec))) {
@@ -224,17 +226,20 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 		return -1;
 	}
 
-	rcu_read_lock();
-	pid = find_vpid(tid); // Get the `pid` struct
-	if (pid) {
-		task = pid_task(pid, PIDTYPE_PID); // Get task from `pid`
-		if (task) {
-			get_task_struct(task); // Increment reference count
-		} else {
-			printk(KERN_INFO "Couldn't find task!\n");
+	if (!task) {
+		rcu_read_lock();
+		pid = find_vpid(tid); // Get the `pid` struct
+		if (pid) {
+			task = pid_task(pid, PIDTYPE_PID); // Get task from `pid`
+			if (task) {
+				get_task_struct(task); // Increment reference count
+			} else {
+				printk(KERN_INFO "Couldn't find task!\n");
+			}
 		}
+		rcu_read_unlock();
 	}
-	rcu_read_unlock();
+
 	if (!task) {
 		return -EFAULT;
 	}
@@ -274,7 +279,7 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 				break;
 			}
 
-			hrtimer_init(&node->period_timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
+			hrtimer_init(&node->period_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 			node->period_timer.function = restart_period;
 			hrtimer_init(&node->cost_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 			node->cost_timer.function = end_of_reserved_time;
@@ -296,8 +301,7 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 		node->cost_ns = timespec_to_ns(&c);
 		node->actively_running = false;
 		node->period_remaining_time = node->costDuration;
-
-
+		node->state = RUNNABLE;
 		
 		memset(node->dataBuffer,0,BUFFER_SIZE);
 		node->offset = 0;
@@ -309,7 +313,10 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 		}
 
 		// start the timer
-		hrtimer_start(&node->period_timer, node->periodDuration, HRTIMER_MODE_ABS);
+		hrtimer_start(&node->period_timer, node->periodDuration, HRTIMER_MODE_REL);
+		if (tid == current->pid) {
+			hrtimer_start(&node->cost_timer, node->costDuration, HRTIMER_MODE_REL);
+		}
 
 	} while (0);
 	debugPrints();
@@ -346,6 +353,32 @@ SYSCALL_DEFINE1(cancel_reserve, pid_t, tid)
 		}
 	}
 	rcu_read_unlock();
+
+	return output;
+}
+
+SYSCALL_DEFINE0(end_job) {
+	struct threadNode *task;
+	long output = EFAULT;
+
+	lockScheduleLL();
+	do {
+		task = findThreadInScheduleLL(current->pid);
+		if (task) {
+			if (!(task->actively_running)) break; // Don't double deschedule
+			pause_timer(task);
+
+			task->actively_running = false;
+			task->state = MAKE_SUSPEND;
+
+			threadHead.need_housekeeping = true;
+			output = 0;
+
+		}
+	} while(0);
+	unlockScheduleLL();
+
+	set_tsk_need_resched(current);
 
 	return output;
 }
