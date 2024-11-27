@@ -24,7 +24,6 @@ void threadHead_init(void) {
 	head_was_init = true;
 	threadHead.need_housekeeping = false;
 	amountReserved = 0;
-	printk(KERN_ERR "RTES: Initialized Threadhead");
 }
 
 bool rtes_head_is_init() {
@@ -68,7 +67,6 @@ static enum hrtimer_restart end_of_reserved_time(struct hrtimer *timer) {
 	struct threadNode *task= container_of(timer, struct threadNode, cost_timer);
 	task->state = MAKE_SUSPEND;
 	threadHead.need_housekeeping = true;
-	printk(KERN_ERR "RTES: Suspending task %d", task->tid);
 
 	// Send SIGEXCESS if overran period
 	// Do we still do this if we're enforcing period?
@@ -131,7 +129,6 @@ static enum hrtimer_restart restart_period(struct hrtimer *timer) {
 	set_tsk_need_resched(current);
 
 	hrtimer_forward_now(timer, task->periodDuration);
-	printk(KERN_ERR "RTES: Un-suspending task %d", task->tid);
 
 	return HRTIMER_RESTART;
 }
@@ -146,7 +143,6 @@ void rtesDescheduleTask(struct task_struct *task) {
 		node = findThreadInScheduleLL(task->pid);
 		if (node == NULL) break;
 
-		printk(KERN_ERR "Switching out of task %d", node->tid);
 
 		if (!(node->actively_running)) break; // Don't double deschedule
 		node->actively_running = false;
@@ -168,7 +164,6 @@ void  rtesScheduleTask(struct task_struct *task) {
 		node = findThreadInScheduleLL(task->pid);
 		if (node == NULL) break;
 
-		printk(KERN_ERR "Switching into task %d", node->tid);
 
 		if (node->actively_running) break; // Don't double schedule
 		node->actively_running = true;
@@ -235,9 +230,14 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 		task = pid_task(pid, PIDTYPE_PID); // Get task from `pid`
 		if (task) {
 			get_task_struct(task); // Increment reference count
+		} else {
+			printk(KERN_INFO "Couldn't find task!\n");
 		}
 	}
 	rcu_read_unlock();
+	if (!task) {
+		return -EFAULT;
+	}
 
 	// converting to string
 	cost.whole = (u16) ktime_to_ms(timespec_to_ktime(c));
