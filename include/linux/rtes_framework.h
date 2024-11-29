@@ -15,6 +15,11 @@ extern  struct rtesThreadHead threadHead;
 extern bool monitoring_active;
 extern struct kobject *rtes_kobject;
 
+struct calc_data {
+    bool negative;
+    u16 whole;
+    u16 decimal;
+};
 
 // Define the structure for linked list nodes
 struct threadNode {
@@ -54,4 +59,10 @@ int removeThreadInScheduleLL(pid_t tid);
 int createThreadFile(struct threadNode  *thread);
 int removeThreadFile(struct threadNode  *thread);
 
+int structured_calc(
+    struct calc_data p1, 
+    struct calc_data p2, 
+    char op, 
+    struct calc_data *result
+);
 #endif /* _RTES_FRAMEWORK_H */
