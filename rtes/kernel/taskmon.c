@@ -215,6 +215,9 @@ static int __init taskmon_init(void) {
     //initailizing the energy sysfs
     energyTracking_init();
 
+    //calculate power and frequency
+    energyCalc_init();
+    
     printk(KERN_INFO "sysfs files created at /sys/rtes/.\n");
 
     return 0;

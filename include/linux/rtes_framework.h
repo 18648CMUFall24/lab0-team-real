@@ -23,7 +23,6 @@ struct calc_data {
 
 struct energy_data {
     unsigned long energy;
-    unsigned long power;
     struct kobject *pidFile;
 };
 
@@ -63,12 +62,19 @@ void lockScheduleLL(void);
 void unlockScheduleLL(void);
 void rtesScheduleTask(struct task_struct *task);
 void rtesDescheduleTask(struct task_struct *task);
+void energyCalc(struct threadNode *task);
+void energyCalc_init(void);
 struct threadNode *findThreadInScheduleLL(pid_t tid);
 int removeThreadInScheduleLL(pid_t tid);
 int createThreadFile(struct threadNode  *thread);
 int removeThreadFile(struct threadNode  *thread);
 int createEnergyThreadFile(struct threadNode *thread);
 int removeEnergyThreadFile(struct threadNode *thread);
+
+
+//math calculation prototypes
+unsigned long fixed_point_mul(unsigned long a, unsigned long b);
+unsigned long fixed_point_div(unsigned long a, unsigned long b);
 
 int structured_calc(
     struct calc_data p1, 
