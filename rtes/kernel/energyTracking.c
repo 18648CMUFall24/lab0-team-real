@@ -19,6 +19,7 @@ static struct kobject *task_kobject;
 static bool energyMonitor = false;
 static unsigned long Power = 0;
 static unsigned long Freq = 0;
+static unsigned long TotalEnergy = 0;
 
 
 // Fixed-point multiplication
@@ -71,6 +72,15 @@ void energyCalc_init(void)
 }
 void energyCalc(struct threadNode *task)
 {
+    unsigned long elapsed_time;
+
+    if(energyMonitor)
+    {
+        elapsed_time = ktime_to_ms(ktime_sub(ktime_get(), task->startTimer));
+        task->energyData.energy = elapsed_time * Power;
+
+        TotalEnergy += task->energyData.energy;
+    }
 	
 }
 
@@ -94,7 +104,18 @@ static struct kobj_attribute frequency_attribute =__ATTR(freq, 0660, freq_show, 
 //total energy consumed sysfs File
 static ssize_t energy_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf) 
 {
-    return sprintf(buf, "No Active Tasks in the Reservation!\n");
+    int count = 0;
+    if(energyMonitor)
+    {
+        
+        count = sprintf(buf, "%lu\n", TotalEnergy);
+        TotalEnergy = 0;
+        return count;
+    }
+    else
+    {
+        return sprintf(buf, "Energy Monitor not enabled!\n");
+    }
 }
 static struct kobj_attribute energy_attribute =__ATTR(energy, 0660, energy_show, NULL);
 
@@ -102,7 +123,41 @@ static struct kobj_attribute energy_attribute =__ATTR(energy, 0660, energy_show,
 //total energy consumed sysfs File
 static ssize_t taskenergy_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf) 
 {
-    return sprintf(buf, "No Active Tasks in the Reservation!\n");
+    struct threadNode *loopedThread = threadHead.head;
+    int extractTid;
+    int ret = kstrtoint(kobj->name, 10, &extractTid);
+    size_t count = 0;
+
+    lockScheduleLL();
+    if (ret != 0) {
+        printk(KERN_ERR "Failed to convert kobj name to integer, error: %d\n", ret);
+        unlockScheduleLL();
+        return count; // Return the error code if conversion fails
+    }
+
+    //Go through to see if the node is in there
+    while(loopedThread != NULL) {
+        if(loopedThread->tid == extractTid)
+        {
+            break;
+        }
+        loopedThread = loopedThread->next;
+    }
+
+    //check if node is found!
+    if(loopedThread != NULL)
+    {
+        //Do Nothing
+    }
+    else
+    {
+        unlockScheduleLL();
+        return sprintf(buf, "Thread not found!\n");
+    }
+
+    unlockScheduleLL();
+    count = sprintf(buf, "%lu\n",loopedThread->energyData.energy);
+    return count;
 }
 static struct kobj_attribute taskenergy_attribute =__ATTR(energy, 0660, taskenergy_show, NULL);
 
@@ -114,6 +169,7 @@ static ssize_t config_energy_store(struct kobject *kobj, struct kobj_attribute *
         // Start data collection for threads with active reservations
     } else if (buf[0] == '0') {
         energyMonitor = false;
+        TotalEnergy = 0;
         // Stop data collection and cleanup
         
     }
