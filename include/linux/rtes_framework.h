@@ -22,7 +22,7 @@ struct calc_data {
 };
 
 struct energy_data {
-    unsigned long energy;
+    char energy[64];
     struct kobject *pidFile;
 };
 
@@ -70,11 +70,6 @@ int createThreadFile(struct threadNode  *thread);
 int removeThreadFile(struct threadNode  *thread);
 int createEnergyThreadFile(struct threadNode *thread);
 int removeEnergyThreadFile(struct threadNode *thread);
-
-
-//math calculation prototypes
-unsigned long fixed_point_mul(unsigned long a, unsigned long b);
-unsigned long fixed_point_div(unsigned long a, unsigned long b);
 
 int structured_calc(
     struct calc_data p1, 

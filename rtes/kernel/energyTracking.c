@@ -8,78 +8,90 @@
 #include <linux/slab.h>
 #include <linux/cpufreq.h>
 #include <linux/cpufreq.h>
-
-#define K          4420  // 0.00442 * 1000
-#define A          1670  // 1.67 * 1000
-#define B          25720 // 25.72 * 1000
-#define FIXED_POINT_SCALE 1000  // Scaling factor
+#include <linux/syscalls.h>
 
 static struct kobject *config_kobject;
 static struct kobject *task_kobject;
 static bool energyMonitor = false;
-static unsigned long Power = 0;
+char Power[64] = "0";
 static unsigned long Freq = 0;
-static unsigned long TotalEnergy = 0;
+char TotalEnergy[64] = "0";
 
-
-// Fixed-point multiplication
-unsigned long fixed_point_mul(unsigned long a, unsigned long b) {
-    return (a * b) / FIXED_POINT_SCALE;
-}
-
-// Fixed-point division
-unsigned long fixed_point_div(unsigned long a, unsigned long b) {
-    return (a * FIXED_POINT_SCALE) / b;
-}
-
-// Exponentiation for f^alpha (approximated with integer exponentiation)
-unsigned long fixed_point_pow(unsigned long base, unsigned long exponent) {
-    unsigned long result = FIXED_POINT_SCALE;  // Start with 1 in fixed-point
-    unsigned long temp_base = base;
-
-    while (exponent > 0) {
-        if (exponent % 2 == 1) {
-            result = fixed_point_mul(result, temp_base);
-        }
-        temp_base = fixed_point_mul(temp_base, temp_base);  // Square the base
-        exponent /= 2;
-    }
-
-    return result;
-}
 
 void energyCalc_init(void)
 {
-    unsigned long freq_khz = cpufreq_quick_get(raw_smp_processor_id());
-    unsigned long freq_to_alpha;
+    // unsigned long freq_khz = cpufreq_quick_get(raw_smp_processor_id());
+    // char frequencyKhzString[16];   // Store frequency in kHz as string
+    // char frequencyMhzString[16] = {};   // Store converted frequency in MHz as string
+    char temp_result1[64] = {};
+    char temp_result2[64] = {};
+    char constant_k[64] = "0.00442";  // κ value (constant for power model)
+    char constant_beta[64] = "25.72"; // β value (constant for power model)
+    char constant_intermediate1[64] = "102329.2992";
+    int ret;
 
+
+   unsigned long freq_khz = cpufreq_quick_get(raw_smp_processor_id());
    
     //convert to Mhz
     printk(KERN_INFO "Before calclated is %lu!\n",freq_khz);
 	Freq = div64_u64(freq_khz,1000);
-    printk(KERN_INFO "Frequency calclated is %lu!\n",Freq);
 
-    // Compute f^alpha (where alpha is 1.67 in fixed-point form as A)
-    freq_to_alpha = fixed_point_pow(Freq, A);  // freq_mhz^1.67
 
-    // Calculate P(f) = K * f^alpha + B
-    Power = fixed_point_mul(K, freq_to_alpha);  // K * f^alpha
-    Power = fixed_point_div(Power, FIXED_POINT_SCALE);  // Scale down after multiplication
-		
-    Power += B;  // Add B to the result
+    // Step 5: Compute power P(f) = κ * f^1.67 + β
+    // Multiply κ (constant_k) by f^1.67 (intermediate1)
+    ret = sys_calc(constant_k, constant_intermediate1, '*', temp_result1);
+    if (ret < 0) {
+        printk(KERN_INFO "Failed to compute κ * f^1.67\n");
+        return;
+    }
 
-	
+    // Add β (constant_beta) to get total power: P(f) = κ * f^1.67 + β
+    ret = sys_calc(temp_result1, constant_beta, '+', temp_result2);
+    if (ret < 0) {
+        printk(KERN_INFO "Failed to compute total power\n");
+        return;
+    }
+
+    //intermediate1` now holds the final power value in mW
+    printk(KERN_INFO "Total power consumption: %s mW\n", temp_result2);
+    strcpy(Power,temp_result2);
+
+    
 }
 void energyCalc(struct threadNode *task)
 {
     unsigned long elapsed_time;
+    char elapsedTimeString[10];
+    char energyConsumption[64] = {};
+    char TotalenergyConsumption[64] = {};
+    int ret;
 
     if(energyMonitor)
     {
         elapsed_time = ktime_to_ms(ktime_sub(ktime_get(), task->startTimer));
-        task->energyData.energy = elapsed_time * Power;
+        sprintf(elapsedTimeString, "%lu", elapsed_time);
 
-        TotalEnergy += task->energyData.energy;
+        printk(KERN_INFO "Elapsed time has been %lu", elapsed_time);
+        //Calculate Energy consumption for a thread
+        ret = sys_calc(Power, elapsedTimeString, '*', energyConsumption);
+        if (ret < 0) {
+            printk(KERN_INFO "Failed To calculate Energy Conumption for thread %dn",task->tid);
+            return;
+        }
+        printk(KERN_INFO "Energy consumption for thread %d is: %s mW\n", task->tid, energyConsumption);
+        strcpy(task->energyData.energy,energyConsumption);
+
+        //increment total energy consumption of the total system!
+        ret = sys_calc(TotalEnergy, energyConsumption, '+', TotalenergyConsumption);
+        if (ret < 0) {
+            printk(KERN_INFO "Failed to add to toal energy with %s for %dn",TotalEnergy, task->tid);
+            return;
+        }
+        printk(KERN_INFO "Total Energy consumption is: %s mW\n", TotalenergyConsumption);
+        strcpy(TotalEnergy,TotalenergyConsumption);
+        
+
     }
 	
 }
@@ -89,7 +101,7 @@ static ssize_t power_show(struct kobject *kobj, struct kobj_attribute *attr, cha
 {
     //unsigned int freq_mhz = get_cpu_freq_mhz();
    // unsigned long power_mw = 
-    return sprintf(buf, "%lu\n", Power);
+    return sprintf(buf, "%s\n", Power);
 }
 static struct kobj_attribute power_attribute =__ATTR(power, 0660, power_show, NULL);
 
@@ -105,11 +117,12 @@ static struct kobj_attribute frequency_attribute =__ATTR(freq, 0660, freq_show, 
 static ssize_t energy_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf) 
 {
     int count = 0;
+    char dataReset[64] = "0";
     if(energyMonitor)
     {
         
-        count = sprintf(buf, "%lu\n", TotalEnergy);
-        TotalEnergy = 0;
+        count = sprintf(buf, "%s\n", TotalEnergy);
+        strcpy(TotalEnergy,dataReset);
         return count;
     }
     else
@@ -156,7 +169,7 @@ static ssize_t taskenergy_show(struct kobject *kobj, struct kobj_attribute *attr
     }
 
     unlockScheduleLL();
-    count = sprintf(buf, "%lu\n",loopedThread->energyData.energy);
+    count = sprintf(buf, "%s\n",loopedThread->energyData.energy);
     return count;
 }
 static struct kobj_attribute taskenergy_attribute =__ATTR(energy, 0660, taskenergy_show, NULL);
@@ -164,12 +177,13 @@ static struct kobj_attribute taskenergy_attribute =__ATTR(energy, 0660, taskener
 //Setting or clearing the energy monitoring functionality
 static ssize_t config_energy_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
 {
+    char dataReset[64] = "0";
     if (buf[0] == '1') {
         energyMonitor = true;
         // Start data collection for threads with active reservations
     } else if (buf[0] == '0') {
         energyMonitor = false;
-        TotalEnergy = 0;
+        strcpy(TotalEnergy,dataReset);
         // Stop data collection and cleanup
         
     }
@@ -196,11 +210,12 @@ int createEnergyThreadFile(struct threadNode *thread)
 {
     int error = 0;
     char data[16];
+    char dataReset[64] = "0";
 
     snprintf(data, 16, "%d", thread->tid);
 
     //initializing the data in the energy
-    thread->energyData.energy = 0;
+    strcpy(thread->energyData.energy,dataReset);
 
 
     //creating rtes directory in the rtes/tasks directory

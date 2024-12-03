@@ -24,8 +24,11 @@ s32 parse_param(const char* param) {
 	bool decimal_seen;
 
 
-	if (param == NULL) return PARSE_FAIL;
-
+	if (param == NULL) 
+	{
+		printk(KERN_INFO "Parameter is null!\n");
+		return PARSE_FAIL;
+	}
 	c = (char*) param;
 	decimal_seen = false;
 	decimal_count = 0;
@@ -34,7 +37,11 @@ s32 parse_param(const char* param) {
 	while (c && *c) {
 		switch (*c) {
 			case '.':
-				if (decimal_seen) return PARSE_FAIL;
+				if (decimal_seen) 
+				{
+					printk(KERN_INFO "Decimal has been seen already!\n");
+					return PARSE_FAIL;
+				}
 				decimal_seen = true; 
 				break;
 			case '0': INC(0) break;
@@ -51,8 +58,16 @@ s32 parse_param(const char* param) {
 		}
 
 		// Fail if exceeding max values
-		if (whole > WHOLE_MASK) return PARSE_FAIL;
-		if (decimal > DECIMAL_MASK) return PARSE_FAIL;
+		if (whole > WHOLE_MASK) 
+		{
+			printk(KERN_INFO "Exceeding max value!\n");
+			return PARSE_FAIL;
+		}
+		if (decimal > DECIMAL_MASK)
+		{ 
+			printk(KERN_INFO "Exceeding Decimal mask!\n");
+			return PARSE_FAIL;
+		}
 		if (decimal_count >= MAX_DECIMAL_PLACES) break;
 		c++;
 	}
@@ -187,17 +202,31 @@ SYSCALL_DEFINE4(calc,
 		char*, result) {
 	s64 p1, p2, output;
 
-	if (result == NULL) return EINVAL;
+	if (result == NULL) 
+	{
+		printk(KERN_INFO "Output is bad before calculation!\n");
+		return EINVAL;
+	}
 	// Need a check that result_buf is long enough? 
 
 	p1 = parse_param(param1);
-	if (p1 < 0) return EINVAL;
+	if (p1 < 0)
+	{
+		printk(KERN_INFO "P1 is wrong parameter!\n");
+		return EINVAL;
+	}
 
 	p2 = parse_param(param2);
-	if (p2 < 0) return EINVAL;
+	if (p2 < 0)
+	{
+		printk(KERN_INFO "P2 is wrong parameter!\n");
+		return EINVAL;
+	}
 
 	output = do_calc(p1, p2, operation);
 	if (output == -EINVAL) {
+		
+		printk(KERN_INFO "Output is bad after calculation!\n");
 		return EINVAL;
 	} else if (output < 0) {
 		print_negative(result, output);
