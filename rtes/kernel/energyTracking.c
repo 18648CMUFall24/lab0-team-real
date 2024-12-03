@@ -7,89 +7,85 @@
 #include <linux/hrtimer.h>
 #include <linux/slab.h>
 #include <linux/cpufreq.h>
-#include <linux/cpufreq.h>
 #include <linux/syscalls.h>
 
 static struct kobject *config_kobject;
 static struct kobject *task_kobject;
 static bool energyMonitor = false;
-char Power[64] = "0";
+unsigned long Power = 0;
 static unsigned long Freq = 0;
 char TotalEnergy[64] = "0";
-
+static unsigned long PowerTable[12] = {28086, 35072, 57053, 100036, 156019, 240038, 311073, 377031, 478002,
+                                       556005, 638099, 726070};
+/*
+28.86 mW
+35.72 mW
+57.53 mW
+100.36 mW
+156.19 mW
+240.38 mW
+311.73 mW
+377.31 mW
+478.02 mW
+556.05 mW
+638.99 mW
+726.70 mW
+*/
 
 void energyCalc_init(void)
 {
-    // unsigned long freq_khz = cpufreq_quick_get(raw_smp_processor_id());
-    // char frequencyKhzString[16];   // Store frequency in kHz as string
-    // char frequencyMhzString[16] = {};   // Store converted frequency in MHz as string
-    char temp_result1[64] = {};
-    char temp_result2[64] = {};
-    char constant_k[64] = "0.00442";  // κ value (constant for power model)
-    char constant_beta[64] = "25.72"; // β value (constant for power model)
-    char constant_intermediate1[64] = "102329.2992";
-    int ret;
+    struct cpufreq_frequency_table *pos, *driver_freq_table;
+    struct cpufreq_policy *policy;
+    unsigned long freq_khz = cpufreq_quick_get(raw_smp_processor_id());
+    int tableIndex = 0;
+    
 
-
-   unsigned long freq_khz = cpufreq_quick_get(raw_smp_processor_id());
-   
-    //convert to Mhz
-    printk(KERN_INFO "Before calclated is %lu!\n",freq_khz);
-	Freq = div64_u64(freq_khz,1000);
-
-
-    // Step 5: Compute power P(f) = κ * f^1.67 + β
-    // Multiply κ (constant_k) by f^1.67 (intermediate1)
-    ret = sys_calc(constant_k, constant_intermediate1, '*', temp_result1);
-    if (ret < 0) {
-        printk(KERN_INFO "Failed to compute κ * f^1.67\n");
+    Freq = div64_u64(freq_khz,1000);
+    // Get the policy for CPU 0
+    policy = cpufreq_cpu_get(0);
+    if (!policy) {
+        printk(KERN_INFO "Failed to retrieve policy for CPU 0.\n");
         return;
     }
 
-    // Add β (constant_beta) to get total power: P(f) = κ * f^1.67 + β
-    ret = sys_calc(temp_result1, constant_beta, '+', temp_result2);
-    if (ret < 0) {
-        printk(KERN_INFO "Failed to compute total power\n");
+    // Retrieve the frequency table from the driver via driver_data
+    driver_freq_table = cpufreq_frequency_get_table(policy->cpu);
+    if (!driver_freq_table) {
+        printk(KERN_INFO "No frequency table found for CPU 0.\n");
+        cpufreq_cpu_put(policy);
         return;
     }
 
-    //intermediate1` now holds the final power value in mW
-    printk(KERN_INFO "Total power consumption: %s mW\n", temp_result2);
-    strcpy(Power,temp_result2);
+    // Iterate over the valid frequency table entries
+    printk(KERN_INFO "Printing all valid frequencies in the driver frequency table:\n");
+    for (pos = driver_freq_table; pos->frequency != CPUFREQ_TABLE_END; pos++) {
+        if (pos->frequency == CPUFREQ_ENTRY_INVALID)
+            continue;
 
+        if(freq_khz == pos->frequency)
+        {
+            printk(KERN_INFO "Frequency: %u kHz\n", pos->frequency);
+            Power = PowerTable[tableIndex];
+            
+            break;
+        }
+        tableIndex++;
+        //printk(KERN_INFO "Frequency: %u kHz\n", pos->frequency);
+    }
+    printk(KERN_INFO "Finished printing frequencies.\n");
+
+    cpufreq_cpu_put(policy); // Release the policy after use
+    return;
     
 }
 void energyCalc(struct threadNode *task)
 {
     unsigned long elapsed_time;
-    char elapsedTimeString[10];
-    char energyConsumption[64] = {};
-    char TotalenergyConsumption[64] = {};
-    int ret;
 
     if(energyMonitor)
     {
         elapsed_time = ktime_to_ms(ktime_sub(ktime_get(), task->startTimer));
-        sprintf(elapsedTimeString, "%lu", elapsed_time);
-
-        printk(KERN_INFO "Elapsed time has been %lu", elapsed_time);
-        //Calculate Energy consumption for a thread
-        ret = sys_calc(Power, elapsedTimeString, '*', energyConsumption);
-        if (ret < 0) {
-            printk(KERN_INFO "Failed To calculate Energy Conumption for thread %dn",task->tid);
-            return;
-        }
-        printk(KERN_INFO "Energy consumption for thread %d is: %s mW\n", task->tid, energyConsumption);
-        strcpy(task->energyData.energy,energyConsumption);
-
-        //increment total energy consumption of the total system!
-        ret = sys_calc(TotalEnergy, energyConsumption, '+', TotalenergyConsumption);
-        if (ret < 0) {
-            printk(KERN_INFO "Failed to add to toal energy with %s for %dn",TotalEnergy, task->tid);
-            return;
-        }
-        printk(KERN_INFO "Total Energy consumption is: %s mW\n", TotalenergyConsumption);
-        strcpy(TotalEnergy,TotalenergyConsumption);
+        
         
 
     }
@@ -101,7 +97,7 @@ static ssize_t power_show(struct kobject *kobj, struct kobj_attribute *attr, cha
 {
     //unsigned int freq_mhz = get_cpu_freq_mhz();
    // unsigned long power_mw = 
-    return sprintf(buf, "%s\n", Power);
+    return sprintf(buf, "%lu\n", Power);
 }
 static struct kobj_attribute power_attribute =__ATTR(power, 0660, power_show, NULL);
 

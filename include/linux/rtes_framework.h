@@ -21,6 +21,7 @@ struct calc_data {
     u16 decimal;
 };
 
+
 struct energy_data {
     char energy[64];
     struct kobject *pidFile;
