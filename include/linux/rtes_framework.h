@@ -23,7 +23,7 @@ struct calc_data {
 
 
 struct energy_data {
-    char energy[64];
+    unsigned long energy;
     struct kobject *pidFile;
 };
 

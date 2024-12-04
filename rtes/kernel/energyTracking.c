@@ -14,7 +14,7 @@ static struct kobject *task_kobject;
 static bool energyMonitor = false;
 unsigned long Power = 0;
 static unsigned long Freq = 0;
-char TotalEnergy[64] = "0";
+unsigned long TotalEnergy = 0;
 static unsigned long PowerTable[12] = {28086, 35072, 57053, 100036, 156019, 240038, 311073, 377031, 478002,
                                        556005, 638099, 726070};
 /*
@@ -81,12 +81,26 @@ void energyCalc_init(void)
 void energyCalc(struct threadNode *task)
 {
     unsigned long elapsed_time;
+    unsigned long elapsed_time_seconds;
+    unsigned long power_watt;
 
     if(energyMonitor)
     {
         elapsed_time = ktime_to_ms(ktime_sub(ktime_get(), task->startTimer));
         
-        
+        //Convert to watt
+        elapsed_time_seconds = div64_u64(elapsed_time,1000);
+        printk(KERN_INFO "Thread ran: %lu kHz\n", elapsed_time_seconds);
+
+        power_watt = div64_u64(Power,1000);
+        printk(KERN_INFO "Power Converted is power: %lu kHz\n", elapsed_time_seconds);
+
+        //calculate energy
+        task->energyData.energy = elapsed_time_seconds * power_watt;
+        printk(KERN_INFO "Energy calculated for thread is: %lu kHz\n", task->energyData.energy);
+
+        //Increment Total Energy
+        TotalEnergy += task->energyData.energy;
 
     }
 	
@@ -113,12 +127,11 @@ static struct kobj_attribute frequency_attribute =__ATTR(freq, 0660, freq_show, 
 static ssize_t energy_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf) 
 {
     int count = 0;
-    char dataReset[64] = "0";
     if(energyMonitor)
     {
         
-        count = sprintf(buf, "%s\n", TotalEnergy);
-        strcpy(TotalEnergy,dataReset);
+        count = sprintf(buf, "%lu\n", TotalEnergy);
+        TotalEnergy = 0;
         return count;
     }
     else
@@ -165,7 +178,7 @@ static ssize_t taskenergy_show(struct kobject *kobj, struct kobj_attribute *attr
     }
 
     unlockScheduleLL();
-    count = sprintf(buf, "%s\n",loopedThread->energyData.energy);
+    count = sprintf(buf, "%lu\n",loopedThread->energyData.energy);
     return count;
 }
 static struct kobj_attribute taskenergy_attribute =__ATTR(energy, 0660, taskenergy_show, NULL);
@@ -173,13 +186,12 @@ static struct kobj_attribute taskenergy_attribute =__ATTR(energy, 0660, taskener
 //Setting or clearing the energy monitoring functionality
 static ssize_t config_energy_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
 {
-    char dataReset[64] = "0";
     if (buf[0] == '1') {
         energyMonitor = true;
         // Start data collection for threads with active reservations
     } else if (buf[0] == '0') {
         energyMonitor = false;
-        strcpy(TotalEnergy,dataReset);
+        TotalEnergy = 0;
         // Stop data collection and cleanup
         
     }
@@ -206,12 +218,11 @@ int createEnergyThreadFile(struct threadNode *thread)
 {
     int error = 0;
     char data[16];
-    char dataReset[64] = "0";
 
     snprintf(data, 16, "%d", thread->tid);
 
     //initializing the data in the energy
-    strcpy(thread->energyData.energy,dataReset);
+    thread->energyData.energy = 0;
 
 
     //creating rtes directory in the rtes/tasks directory
