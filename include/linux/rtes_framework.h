@@ -89,6 +89,11 @@ int removeThreadFile(struct threadNode  *thread);
 int createEnergyThreadFile(struct threadNode *thread);
 int removeEnergyThreadFile(struct threadNode *thread);
 
+
+void remove_task_from_bucket(pid_t tid, u8 bucket_no);
+s8 insert_task(struct threadNode *task);
+void print_buckets(void);
+
 int structured_calc(
     struct calc_data p1, 
     struct calc_data p2, 
