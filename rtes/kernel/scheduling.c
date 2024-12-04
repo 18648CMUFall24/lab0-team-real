@@ -447,7 +447,7 @@ static ssize_t partition_set(struct kobject *kobj, struct kobj_attribute *attr, 
 
 static struct kobj_attribute partition_attribute =__ATTR(partition_policy, 0660, partition_show, partition_set);
 
-void partion_init(void)
+void partition_init(void)
 {
 	int error = 0;
 
@@ -462,7 +462,7 @@ void partion_init(void)
     }
 }
 
-void partion_exit(void)
+void partition_exit(void)
 {
 	sysfs_remove_file(rtes_kobject, &partition_attribute.attr);
 }

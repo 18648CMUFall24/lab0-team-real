@@ -212,7 +212,8 @@ static int __init taskmon_init(void) {
     //calculate power and frequency
     energyCalc_init();
     
-    partion_init();
+    //Initializing the partition sysfs
+    partition_init();
 
     printk(KERN_INFO "sysfs files created at /sys/rtes/.\n");
 
@@ -232,6 +233,8 @@ static void __exit taskmon_exit(void) {
     //delete the energy tracking directories and files
     energyTracking_exit();
 
+    //delete the partition exit
+    partition_exit();
 
     //delete the directory
     kobject_put(taskmon_kobj);
