@@ -83,6 +83,7 @@ void energyCalc(struct threadNode *task)
 {
     unsigned long elapsed_time;
     unsigned long elapsed_time_seconds;
+    unsigned long diff;
 
     if(energyMonitor)
     {
@@ -94,13 +95,26 @@ void energyCalc(struct threadNode *task)
 
         printk(KERN_INFO "Power Converted is power: %lu kHz\n", elapsed_time_seconds);
 
+        //set Previous energy
+        task->energyData.prevEnergy = task->energyData.energy;
+
         //calculate energy
         task->energyData.energy = elapsed_time_seconds * Power;
         printk(KERN_INFO "Energy calculated for thread is: %lu mJ\n", task->energyData.energy);
 
+        //calculate the difference 
+        diff = task->energyData.energy - task->energyData.prevEnergy;
+        printk(KERN_INFO "Energy difference for thread is: %lu mJ\n", diff);
+    
         //Increment Total Energy
-        TotalEnergy += task->energyData.energy;
+        TotalEnergy += diff;
 
+    }
+    else
+    {
+        task->energyData.energy = 0;
+        task->energyData.prevEnergy = 0;
+        TotalEnergy = 0;
     }
 	
 }
@@ -141,7 +155,7 @@ static ssize_t energy_show(struct kobject *kobj, struct kobj_attribute *attr, ch
 static struct kobj_attribute energy_attribute =__ATTR(energy, 0660, energy_show, NULL);
 
 
-//total energy consumed sysfs File
+//individual energy consumed sysfs File
 static ssize_t taskenergy_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf) 
 {
     struct threadNode *loopedThread = threadHead.head;
@@ -177,7 +191,14 @@ static ssize_t taskenergy_show(struct kobject *kobj, struct kobj_attribute *attr
     }
 
     unlockScheduleLL();
-    count = sprintf(buf, "%lu\n",loopedThread->energyData.energy);
+    if(energyMonitor)
+    {
+        count = sprintf(buf, "%lu\n",loopedThread->energyData.energy);
+    }
+    else
+    {
+        count = sprintf(buf, "Energy Monitor not enabled!\n");
+    }
     return count;
 }
 static struct kobj_attribute taskenergy_attribute =__ATTR(energy, 0660, taskenergy_show, NULL);
