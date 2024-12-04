@@ -11,10 +11,14 @@
 
 static struct kobject *config_kobject;
 static struct kobject *task_kobject;
+static ktime_t monitorTimer;
 static bool energyMonitor = false;
+static 
 unsigned long Power = 0;   //In mWatts
 static unsigned long Freq = 0;   //In MHz
 unsigned long TotalEnergy = 0;  //In mJ
+unsigned long prevEnergy = 0;
+unsigned long calcEnergy = 0;
 static unsigned long PowerTable[12] = {28086, 35072, 57053, 100036, 156019, 240038, 311073, 377031, 478002,
                                        556005, 638099, 726070};
 /*
@@ -82,6 +86,8 @@ void energyCalc_init(void)
 void energyCalc(struct threadNode *task)
 {
     unsigned long elapsed_time;
+    unsigned long elapsed_timeMonitor;
+    unsigned long elapsed_timeMonitor_seconds;
     unsigned long elapsed_time_seconds;
     unsigned long diff;
 
@@ -89,21 +95,26 @@ void energyCalc(struct threadNode *task)
     {
         elapsed_time = ktime_to_ms(ktime_sub(ktime_get(), task->startTimer));
         
+        //Elapsed time since montior reset
+        elapsed_timeMonitor = ktime_to_ms(ktime_sub(ktime_get(), monitorTimer));
+
         //Convert to watt
         elapsed_time_seconds = div64_u64(elapsed_time,1000);
-        printk(KERN_INFO "Thread ran: %lu kHz\n", elapsed_time);
+        elapsed_timeMonitor_seconds =div64_u64(elapsed_timeMonitor,1000);
+        printk(KERN_INFO "Thread ran: %lu kHz\n", elapsed_time_seconds);
+        printk(KERN_INFO "Monitor session ran: %lu kHz\n", elapsed_timeMonitor_seconds);
 
-        printk(KERN_INFO "Power Converted is power: %lu kHz\n", elapsed_time_seconds);
-
+        
         //set Previous energy
-        task->energyData.prevEnergy = task->energyData.energy;
+        prevEnergy = calcEnergy;
 
         //calculate energy
         task->energyData.energy = elapsed_time_seconds * Power;
+        calcEnergy = elapsed_timeMonitor_seconds * Power;
         printk(KERN_INFO "Energy calculated for thread is: %lu mJ\n", task->energyData.energy);
 
         //calculate the difference 
-        diff = task->energyData.energy - task->energyData.prevEnergy;
+        diff = calcEnergy - prevEnergy;
         printk(KERN_INFO "Energy difference for thread is: %lu mJ\n", diff);
     
         //Increment Total Energy
@@ -112,8 +123,6 @@ void energyCalc(struct threadNode *task)
     }
     else
     {
-        task->energyData.energy = 0;
-        task->energyData.prevEnergy = 0;
         TotalEnergy = 0;
     }
 	
@@ -136,6 +145,16 @@ static ssize_t freq_show(struct kobject *kobj, struct kobj_attribute *attr, char
 static struct kobj_attribute frequency_attribute =__ATTR(freq, 0660, freq_show, NULL);
 
 
+static ssize_t  energy_reset(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+    
+    monitorTimer = ktime_get();
+    TotalEnergy = 0;
+    calcEnergy = 0;
+    return count; 
+}
+
+
 //total energy consumed sysfs File
 static ssize_t energy_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf) 
 {
@@ -152,7 +171,7 @@ static ssize_t energy_show(struct kobject *kobj, struct kobj_attribute *attr, ch
         return sprintf(buf, "Energy Monitor not enabled!\n");
     }
 }
-static struct kobj_attribute energy_attribute =__ATTR(energy, 0660, energy_show, NULL);
+static struct kobj_attribute energy_attribute =__ATTR(energy, 0660, energy_show, energy_reset);
 
 
 //individual energy consumed sysfs File
@@ -208,10 +227,12 @@ static ssize_t config_energy_store(struct kobject *kobj, struct kobj_attribute *
 {
     if (buf[0] == '1') {
         energyMonitor = true;
+        monitorTimer = ktime_get();
         // Start data collection for threads with active reservations
     } else if (buf[0] == '0') {
         energyMonitor = false;
         TotalEnergy = 0;
+        calcEnergy = 0;
         // Stop data collection and cleanup
         
     }
@@ -328,6 +349,8 @@ void energyTracking_init(void)
         }
         
     }
+
+    monitorTimer = ktime_get();
 
 
 

@@ -24,7 +24,6 @@ struct calc_data {
 
 struct energy_data {
     unsigned long energy;
-    unsigned long prevEnergy;
     struct kobject *pidFile;
 };
 
