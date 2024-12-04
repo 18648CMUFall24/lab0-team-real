@@ -47,6 +47,10 @@ static enum hrtimer_restart restart_period(struct hrtimer *timer) {
 	getrawmonotonic(&cur);
 	task->prev_schedule = timespec_to_ns(&cur);
 
+	
+	energyCalc(task);
+
+
 	if(monitoring_active)
 	{
 

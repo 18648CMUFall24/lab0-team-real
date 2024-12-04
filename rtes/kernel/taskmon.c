@@ -115,6 +115,9 @@ int createThreadFile(struct threadNode *thread)
     // Store a reference to the attribute in the thread structure if needed
     thread->thread_obj = threadAtt;
 
+    //Created the thread file for energy
+    createEnergyThreadFile(thread);
+
     return 0;
 }
 
@@ -126,6 +129,8 @@ int removeThreadFile(struct threadNode  *thread)
     kfree(thread->thread_obj->attr.name);
     kfree(thread->thread_obj);
     
+    removeEnergyThreadFile(thread);
+
     return 0;
 }
 
@@ -207,6 +212,12 @@ static int __init taskmon_init(void) {
     //Initilizing the reservation status sysfs
     reservationStatus_init();
 
+    //initailizing the energy sysfs
+    energyTracking_init();
+
+    //calculate power and frequency
+    energyCalc_init();
+    
     printk(KERN_INFO "sysfs files created at /sys/rtes/.\n");
 
     return 0;
@@ -221,6 +232,10 @@ static void __exit taskmon_exit(void) {
 
     //delete the reservation status exit
     reservationStatus_exit();
+
+    //delete the energy tracking directories and files
+    energyTracking_exit();
+
 
     //delete the directory
     kobject_put(taskmon_kobj);

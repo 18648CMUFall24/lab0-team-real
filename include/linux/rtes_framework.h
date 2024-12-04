@@ -21,10 +21,17 @@ struct calc_data {
     u16 decimal;
 };
 
+
+struct energy_data {
+    unsigned long energy;
+    struct kobject *pidFile;
+};
+
 // Define the structure for linked list nodes
 struct threadNode {
     struct timespec C;		    // Computation time (ms)
     struct timespec T;		    // Period time (ms)
+    struct energy_data energyData;    //storing the energy data per thread
     pid_t tid;			    // Thread ID
     int cpuid;			    // CPU ID
     ktime_t periodDuration;	    // Duration as ktime_t
@@ -50,14 +57,20 @@ struct rtesThreadHead {
 
 void reservationStatus_init(void);
 void reservationStatus_exit(void);
+void energyTracking_init(void);
+void energyTracking_exit(void);
 void lockScheduleLL(void);
 void unlockScheduleLL(void);
 void rtesScheduleTask(struct task_struct *task);
 void rtesDescheduleTask(struct task_struct *task);
+void energyCalc(struct threadNode *task);
+void energyCalc_init(void);
 struct threadNode *findThreadInScheduleLL(pid_t tid);
 int removeThreadInScheduleLL(pid_t tid);
 int createThreadFile(struct threadNode  *thread);
 int removeThreadFile(struct threadNode  *thread);
+int createEnergyThreadFile(struct threadNode *thread);
+int removeEnergyThreadFile(struct threadNode *thread);
 
 int structured_calc(
     struct calc_data p1, 
