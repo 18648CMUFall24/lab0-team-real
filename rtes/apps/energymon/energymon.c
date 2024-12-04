@@ -8,7 +8,7 @@
 #define SYSFS_ENERGY_TID_PATH_FMT "/sys/rtes/tasks/%d/energy"
 #define SYSFS_ENABLED_PATH "/sys/rtes/config/energy"
 
-void read_sysfs_value(const char *path, long *value) {
+void read_sysfs_value(const char *path, unsigned long *value) {
     FILE *file = fopen(path, "r");
     if (!file) {
         perror("Failed to open sysfs file");
@@ -45,7 +45,7 @@ int main(int argc, char *argv[]) {
 
     int tid = atoi(argv[1]);
     char energy_tid_path[256];
-    long freq_khz = 0, power_mw = 0, energy_mj = 0;
+    unsigned long freq_khz = 0, power_mw = 0, energy_mj = 0, totalEnergy = 0;
 
     if (tid < 0) {
         fprintf(stderr, "Invalid tid: %d\n", tid);
@@ -57,7 +57,13 @@ int main(int argc, char *argv[]) {
 		printf("Energy path is %s\n",energy_tid_path);
     }
 
-	 // Enable energy monitoring
+    //Disable energy monitoring at the beginning to reset data
+    write_sysfs_value(SYSFS_ENABLED_PATH, "0");
+    
+    // Wait for 1 second
+    sleep(1);
+
+	// Enable energy monitoring
     write_sysfs_value(SYSFS_ENABLED_PATH, "1");
 
     printf("FREQ (MHZ)\tPOWER (mW)\tENERGY (mJ)\n");
@@ -72,12 +78,14 @@ int main(int argc, char *argv[]) {
         // Read energy consumption (mJ)
         if (tid > 0) {
             read_sysfs_value(energy_tid_path, &energy_mj);
+            totalEnergy = energy_mj;
         } else {
             read_sysfs_value(SYSFS_ENERGY_PATH, &energy_mj);
+            totalEnergy+= energy_mj;
         }
 
         // Print the values in the required format
-        printf("%lu\t\t%lu\t\t%lu\n", freq_khz, power_mw, energy_mj);
+        printf("%lu\t\t%lu\t\t%lu\n", freq_khz, power_mw, totalEnergy);
 
         // Wait for 1 second
         sleep(1);
