@@ -12,9 +12,9 @@
 static struct kobject *config_kobject;
 static struct kobject *task_kobject;
 static bool energyMonitor = false;
-unsigned long Power = 0;
-static unsigned long Freq = 0;
-unsigned long TotalEnergy = 0;
+unsigned long Power = 0;   //In mWatts
+static unsigned long Freq = 0;   //In MHz
+unsigned long TotalEnergy = 0;  //In mJ
 static unsigned long PowerTable[12] = {28086, 35072, 57053, 100036, 156019, 240038, 311073, 377031, 478002,
                                        556005, 638099, 726070};
 /*
@@ -66,6 +66,7 @@ void energyCalc_init(void)
         {
             printk(KERN_INFO "Frequency: %u kHz\n", pos->frequency);
             Power = PowerTable[tableIndex];
+            Power = div64_u64(Power,1000);
             
             break;
         }
@@ -82,7 +83,6 @@ void energyCalc(struct threadNode *task)
 {
     unsigned long elapsed_time;
     unsigned long elapsed_time_seconds;
-    unsigned long power_mwatt;
 
     if(energyMonitor)
     {
@@ -92,12 +92,11 @@ void energyCalc(struct threadNode *task)
         elapsed_time_seconds = div64_u64(elapsed_time,1000);
         printk(KERN_INFO "Thread ran: %lu kHz\n", elapsed_time);
 
-        power_mwatt = div64_u64(Power,1000);
         printk(KERN_INFO "Power Converted is power: %lu kHz\n", elapsed_time_seconds);
 
         //calculate energy
-        task->energyData.energy = elapsed_time_seconds * power_mwatt;
-        printk(KERN_INFO "Energy calculated for thread is: %lu kHz\n", task->energyData.energy);
+        task->energyData.energy = elapsed_time_seconds * Power;
+        printk(KERN_INFO "Energy calculated for thread is: %lu mJ\n", task->energyData.energy);
 
         //Increment Total Energy
         TotalEnergy += task->energyData.energy;
