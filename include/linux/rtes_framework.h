@@ -75,6 +75,8 @@ bool rtes_head_is_init(void);
 bool rtes_needs_housekeeping(void);
 void rtes_done_housekeeping(void);
 struct threadNode *getFirstThreadNode(void);
+void partion_init(void);
+void partion_exit(void);
 void lockScheduleLL(void);
 void unlockScheduleLL(void);
 void rtesScheduleTask(struct task_struct *task);

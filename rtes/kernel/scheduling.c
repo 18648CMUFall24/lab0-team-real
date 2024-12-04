@@ -387,6 +387,85 @@ void print_buckets() {
 	}
 }
 
+// Reading 'enabled' attribute - shows if monitoring is active or not
+static ssize_t partition_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf) 
+{
+	switch (algo) {
+		case FF: return sprintf(buf, "FF!!\n");
+		case NF: return sprintf(buf, "NF!!\n");
+		case BF: return sprintf(buf, "BF!!\n");
+		case WF: return sprintf(buf, "WF!!\n");
+		case PA: return sprintf(buf, "PA!!\n");
+		case LST: return sprintf(buf, "LST!!\n");
+		default:
+			return sprintf(buf, "somehow trying to use invalid partition!!\n");
+	}
+
+}
+
+// Reading 'enabled' attribute - shows if monitoring is active or not
+static ssize_t partition_set(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count) 
+{
+    if(buf[0] == 'F' && buf[1] == 'F')
+	{
+		algo = FF;
+		return count;
+	}
+	else if(buf[0] == 'N' && buf[1] == 'F')
+	{
+		algo = NF;
+		return count;
+	}
+	else if(buf[0] == 'B' && buf[1] == 'F')
+	{
+		algo = BF;
+		return count;
+	}
+	else if(buf[0] == 'W' && buf[1] == 'F')
+	{
+		algo = WF;
+		return count;
+	}
+	else if(buf[0] == 'P' && buf[1] == 'A')
+	{
+		algo = PA;
+		return count;
+	}
+	else if(buf[0] == 'L' && buf[1] == 'S' && buf[2] == 'T')
+	{
+		algo = LST;
+		return count;
+	}
+	else
+	{
+		printk(KERN_INFO "Invalid Partition policy!\n");
+		return count;
+	}
+}
+
+
+
+static struct kobj_attribute partition_attribute =__ATTR(partition_policy, 0660, partition_show, partition_set);
+
+void partion_init(void)
+{
+	int error = 0;
+
+    //make sure the rtes directory exist!
+    if(rtes_kobject != NULL)
+    {
+        error = sysfs_create_file(rtes_kobject, &partition_attribute.attr);
+        if(error)
+        {
+            printk(KERN_INFO "Unable to create the reservation status file!\n"); 
+        }
+    }
+}
+
+void partion_exit(void)
+{
+	sysfs_remove_file(rtes_kobject, &partition_attribute.attr);
+}
 /*
 int main() {
 	struct bucket_task_ll A = {.tid=0, .cost=800, .period=1000, .util=0, .next=NULL};
