@@ -6,6 +6,7 @@
 #define SYSFS_POWER_PATH "/sys/rtes/power"
 #define SYSFS_ENERGY_PATH "/sys/rtes/energy"
 #define SYSFS_ENERGY_TID_PATH_FMT "/sys/rtes/tasks/%d/energy"
+#define SYSFS_ENABLED_PATH "/sys/rtes/config/energy"
 
 void read_sysfs_value(const char *path, long *value) {
     FILE *file = fopen(path, "r");
@@ -15,6 +16,21 @@ void read_sysfs_value(const char *path, long *value) {
     }
     if (fscanf(file, "%ld", value) != 1) {
         perror("Failed to read value from sysfs file");
+        fclose(file);
+        exit(EXIT_FAILURE);
+    }
+    fclose(file);
+}
+
+// Function to write a value to a sysfs file
+void write_sysfs_value(const char *path, const char *value) {
+    FILE *file = fopen(path, "w");
+    if (!file) {
+        perror("Failed to open sysfs file for writing");
+        exit(EXIT_FAILURE);
+    }
+    if (fprintf(file, "%s", value) < 0) {
+        perror("Failed to write value to sysfs file");
         fclose(file);
         exit(EXIT_FAILURE);
     }
@@ -41,6 +57,9 @@ int main(int argc, char *argv[]) {
 		printf("Energy path is %s\n",energy_tid_path);
     }
 
+	 // Enable energy monitoring
+    write_sysfs_value(SYSFS_ENABLED_PATH, "1");
+
     printf("FREQ (MHZ)\tPOWER (mW)\tENERGY (mJ)\n");
 
     while (1) {
@@ -64,5 +83,7 @@ int main(int argc, char *argv[]) {
         sleep(1);
     }
 
+	//Disable energy monitoring
+    write_sysfs_value(SYSFS_ENABLED_PATH, "0");
     return EXIT_SUCCESS;
 }
