@@ -19,7 +19,6 @@ struct bucket_task_ll {
 };
 
 struct bucket_info {
-	// struct calc_data running_util;
 	unsigned int running_util;
 	unsigned int num_tasks;
 	struct bucket_task_ll *first_task;
@@ -39,77 +38,127 @@ bool increase_bucket_count() {
 	}
 }
 
-// bool check_util_PA(struct calc_data util) {
 bool check_util_PA(unsigned int util) {
-	/*
-	if (util.whole > 1 || (util.whole == 1 && util.decimal > 0)) { 
-		return false; 
-	} else {
-		return true
-	}
-	*/
 	return util <= 1000;
 }
 
-// bool check_util(struct calc_data util, u64 tasks) {
-bool check_util(unsigned int util, unsigned int tasks) {
-	return check_util_PA(util);
-
-	/*
+bool utilization_bound_test(unsigned int util, unsigned int tasks) {
 	// Greater than 100% util isn't allowed
-	// if (util.whole > 1 || (util.whole == 1 && util.decimal > 0)) { return false; }
 	if (util > 1000) {return false;}
 
 	// Due to rounding error sometimes 0% util will exist which is fine
-	// if (util.whole == 0 && util.decimal == 0) { return true; }
-	if (util == 0) {return false;}
+	if (util == 0) { return true; }
 
 	if (tasks == 0) {
 		// No tasks == No Util
-		// return ((util.whole == 0) && (util.decimal == 0));
 		return util == 0;
 	} else if (tasks == 1) {
-		// Works because other cases are caught above
-		// return (util.whole == 1) ^ (util.decimal != 0);
 		return util <= 1000;
 	} else {
-		// if (util.whole > 0) { return false; }
-		if (util > 1000) { return false; }
-
 		if (tasks > 10) {
 			// Hedging tests won't test edge cases like 11 tasks and 70% util
 			// Bounding more than 10 tasks to 0.693
-			// return util.decimal <= MAX_UTIL;
 			return util<= MAX_UTIL;
 		} else {
 			// Actual checking on precomputed bounds for less than 10 tasks
-			// return util.decimal <= UTIL_TABLE[tasks];
 			return util <= UTIL_TABLE[tasks];
 		}
 	}
-	*/
 }
 
+unsigned long rt_ceil_div(unsigned int rt, unsigned int period) {
+	int out = rt / period;
+	if (rt % period) out++;
+	return out;
+}
+
+unsigned long rt_accumulate_init(struct bucket_info *bucket, struct bucket_task_ll *task) {
+	unsigned long a = 0;
+	struct bucket_task_ll *search = bucket->first_task;
+
+	while (search && search != task && search->period <= task->period) {
+		a += search->cost;
+		search = search->next;
+	}
+
+	return a;
+}
+
+unsigned long rt_accumulate(struct bucket_info *bucket, struct bucket_task_ll *task, unsigned long old_a) {
+	unsigned long a = task->cost;
+	struct bucket_task_ll *search = bucket->first_task;
+
+	while (search && search != task && search->period <= task->period) {
+		a += rt_ceil_div(old_a, search->period) * search->cost;
+		search = search->next;
+	}
+
+	return a;
+}
+
+bool response_time_test(struct bucket_info *bucket, struct bucket_task_ll *task) {
+	// Assume response_time_test passes for all tasks in bucket
+	int old;
+	
+	// Phase 1 - Check it's possible to admit the new task
+	int a = rt_accumulate_init(bucket, task);
+	do {
+		if (a > task->period) { return false; }
+		old = a;
+		a = rt_accumulate(bucket, task, old);
+	} while (a != old);
 
 
-int find_FF(unsigned int util) {
+	// Phase 2 - Check all old tasks still are schedulable with new task
+	struct bucket_task_ll *search = bucket->first_task;
+	while (search) {
+		int a = rt_accumulate_init(bucket, search);
+		do {
+			if (a > search->period) { return false; }
+			old = a;
+			a = rt_accumulate(bucket, task, old);
+			if (search->period < task->period) {
+				a += rt_ceil_div(old, task->period) * task->cost;
+			}
+		} while (a != old);
+		
+		search = search->next;
+	}
+
+	return true;
+}
+
+bool check_util(struct bucket_info *bucket, struct bucket_task_ll *task) {
+	bool valid = false;
+	int new_util = bucket->running_util + task->util;
+	int new_num_tasks = bucket->num_tasks + 1;
+
+	if (new_util > 1000) return false;
+
+	if (utilization_bound_test(new_util, new_num_tasks)) {
+		return true;
+	} else if (response_time_test(bucket, task)){
+		printf("Resorting to response time test\n");
+		return true;
+	} else {
+		return false;
+	}
+}
+
+int find_FF(struct bucket_task_ll *task) {
 	for (int i = 0; i < num_buckets; i++) {
-		unsigned int computed_util = util + buckets[i].running_util;
-		unsigned int new_task_count = 1 + buckets[i].num_tasks;
-		if (check_util(computed_util, new_task_count)) {
+		if (check_util(&buckets[i], task)) {
 			return i;
 		} 
 	}
 	return -1;
 }
 
-int find_NF(unsigned int util) {
+int find_NF(struct bucket_task_ll *task) {
 	static unsigned int next_bucket = 0;
 
 	for (int i = 0; i < 4; i++) {
-		unsigned int computed_util = util + buckets[next_bucket].running_util;
-		unsigned int new_task_count = 1 + buckets[next_bucket].num_tasks;
-		if (check_util(computed_util, new_task_count)) {
+		if (check_util(&buckets[next_bucket], task)) {
 			return  next_bucket;;
 		} else {
 			next_bucket = (next_bucket + 1) % num_buckets;
@@ -119,15 +168,13 @@ int find_NF(unsigned int util) {
 	return -1;
 }
 
-int find_BF(unsigned int util) {
+int find_BF(struct bucket_task_ll *task) {
 	int best_utilized_bucket = -1;
 	int best_utilization = -1;
 
 	for (int i = 0; i < num_buckets; i++) {
 		if ((int) buckets[i].running_util > best_utilization) {
-			unsigned int computed_util = util + buckets[i].running_util;
-			unsigned int new_task_count = 1 + buckets[i].num_tasks;
-			if (check_util(computed_util, new_task_count)) {
+			if (check_util(&buckets[i], task)) {
 				best_utilized_bucket = i;
 				best_utilization = buckets[i].running_util;
 			} 
@@ -137,7 +184,7 @@ int find_BF(unsigned int util) {
 	return best_utilized_bucket;
 }
 
-int find_WF(unsigned int util) {
+int find_WF(struct bucket_task_ll *task) {
 	int least_utilized_bucket = -1;
 	int least_utilization = 1001;
 
@@ -148,33 +195,30 @@ int find_WF(unsigned int util) {
 		}
 	}
 
-	unsigned int computed_util = util + buckets[least_utilized_bucket].running_util;
-	unsigned int new_task_count = 1 + buckets[least_utilized_bucket].num_tasks;
-
-	if (check_util(computed_util, new_task_count)) {
+	if (check_util(&buckets[least_utilized_bucket], task)) {
 		return least_utilized_bucket;
 	} else {
 		return -1;
 	}
 }
 
-int find_PA(unsigned int util, unsigned int period) {
+int find_PA(struct bucket_task_ll *task) {
 	struct bucket_task_ll *tmp;
 	for (int i = 0; i < num_buckets; i++) {
 		tmp = buckets[i].first_task;
 		bool valid = true;
 		while(tmp) {
-			if (tmp->period > period) {
-				valid = (tmp->period % period == 0);
+			if (tmp->period > task->period) {
+				valid = (tmp->period % task->period == 0);
 			} else {
-				valid = (period % tmp->period == 0);
+				valid = (task->period % tmp->period == 0);
 			}
 
 			if (!valid) break;
 			tmp = tmp->next;
 		}
 
-		unsigned int computed_util = util + buckets[i].running_util;
+		unsigned int computed_util = task->util + buckets[i].running_util;
 		if (valid && check_util_PA(computed_util)) {
 			return i;
 		}
@@ -183,9 +227,9 @@ int find_PA(unsigned int util, unsigned int period) {
 	return -1;
 }
 
-int find_LST(unsigned int util) {
+int find_LST(struct bucket_task_ll *task) {
 	increase_bucket_count();
-	return find_WF(util);
+	return find_WF(task);
 }
 
 // Finds a bucket 
@@ -194,32 +238,47 @@ int find_bucket(struct bucket_task_ll *task) {
 	unsigned int util = (task->cost * 1000) / task->period;
 	task->util = util;
 	switch (algo) {
-		case FF: return find_FF(util);
-		case NF: return find_NF(util);
-		case BF: return find_BF(util);
-		case WF: return find_WF(util);
-		case PA: return find_PA(util, task->period);
-		case LST: return find_LST(util);
+		case FF: return find_FF(task);
+		case NF: return find_NF(task);
+		case BF: return find_BF(task);
+		case WF: return find_WF(task);
+		case PA: return find_PA(task);
+		case LST: return find_LST(task);
 		default:
 			printf("Somehow trying to use invalid insertion algorithm");
 			return -1;
 	}
 }
 
-void add_task_to_bucket(struct bucket_task_ll *task, unsigned int bucket) {
-	task->next = buckets[bucket].first_task;
-	buckets[bucket].first_task = task;
-	buckets[bucket].num_tasks++;
-	buckets[bucket].running_util += task->util;
+void add_task_to_bucket(struct bucket_info *bucket, struct bucket_task_ll *task) {
+	if (bucket == NULL) return;
+
+	if (bucket->first_task == NULL || task->period < bucket->first_task->period) {
+		task->next = bucket->first_task;
+		bucket->first_task = task;
+	} else {
+		struct bucket_task_ll *prev = bucket->first_task;
+		struct bucket_task_ll *search = bucket->first_task;
+		while (search && search->period <= task->period) {
+			prev = search;
+			search = search->next;
+		}
+		prev->next = task;
+		task->next = search;
+	}
+
+	bucket->num_tasks++;
+	bucket->running_util += task->util;
 }
 
-// TODO: Change to take in threadNode
-void remove_task_from_bucket(struct bucket_task_ll *task, unsigned int bucket) {
-	struct bucket_task_ll *prev = buckets[bucket].first_task;
-	struct bucket_task_ll *search = buckets[bucket].first_task;
+void remove_task_from_bucket(struct bucket_info *bucket, struct bucket_task_ll *task) {
+	if (bucket == NULL) return;
+
+	struct bucket_task_ll *prev = bucket->first_task;
+	struct bucket_task_ll *search = bucket->first_task;
 
 	if (prev->tid == task->tid) {
-		buckets[bucket].first_task = buckets[bucket].first_task->next;
+		bucket->first_task = buckets->first_task->next;
 	}
 
 	while (search && search->tid != task->tid) {
@@ -229,8 +288,8 @@ void remove_task_from_bucket(struct bucket_task_ll *task, unsigned int bucket) {
 
 	if (search && (search->tid == task->tid)) {
 		prev->next = search->next;
-		buckets[bucket].running_util -= task->util;
-		buckets[bucket].num_tasks--;
+		bucket->running_util -= task->util;
+		bucket->num_tasks--;
 	}
 }
 
@@ -246,8 +305,8 @@ int insert_task(struct bucket_task_ll *task) {
 		bucket = find_bucket(task);
 	}
 
-	if (bucket >= 0) {
-		add_task_to_bucket(task, bucket);
+	if (bucket >= 0 && bucket < MAX_PROCESSORS) {
+		add_task_to_bucket(&buckets[bucket], task);
 	} else {
 		printf("Failed to insert task %d", task->tid);
 	}
@@ -275,9 +334,9 @@ int main() {
 	struct bucket_task_ll D = {.tid=3, .cost=600, .period=1000, .util=0, .next=NULL};
 	struct bucket_task_ll E = {.tid=4, .cost=200, .period=1000, .util=0, .next=NULL};
 	struct bucket_task_ll F = {.tid=5, .cost=400, .period=1000, .util=0, .next=NULL};
-	struct bucket_task_ll G = {.tid=5, .cost=100, .period=1000, .util=0, .next=NULL};
+	struct bucket_task_ll G = {.tid=6, .cost=100, .period=1000, .util=0, .next=NULL};
 
-	algo = WF;
+	algo = FF;
 
 	// print_buckets();
 	insert_task(&A);
