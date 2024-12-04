@@ -82,7 +82,7 @@ void energyCalc(struct threadNode *task)
 {
     unsigned long elapsed_time;
     unsigned long elapsed_time_seconds;
-    unsigned long power_watt;
+    unsigned long power_mwatt;
 
     if(energyMonitor)
     {
@@ -90,13 +90,13 @@ void energyCalc(struct threadNode *task)
         
         //Convert to watt
         elapsed_time_seconds = div64_u64(elapsed_time,1000);
-        printk(KERN_INFO "Thread ran: %lu kHz\n", elapsed_time_seconds);
+        printk(KERN_INFO "Thread ran: %lu kHz\n", elapsed_time);
 
-        power_watt = div64_u64(Power,1000);
+        power_mwatt = div64_u64(Power,1000);
         printk(KERN_INFO "Power Converted is power: %lu kHz\n", elapsed_time_seconds);
 
         //calculate energy
-        task->energyData.energy = elapsed_time_seconds * power_watt;
+        task->energyData.energy = elapsed_time_seconds * power_mwatt;
         printk(KERN_INFO "Energy calculated for thread is: %lu kHz\n", task->energyData.energy);
 
         //Increment Total Energy
