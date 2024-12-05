@@ -45,17 +45,17 @@ bool increase_bucket_count(void) {
 			if (!cpu_online(i))
 			{
 				if(!cpu_up(i)) {
-                	printk(KERN_INFO "Processor %d successfully turned on in increase bucket count\n", i);
-                	buckets[i].processorOn = true;
+					printk(KERN_INFO "Processor %d successfully turned on in increase bucket count\n", i);
+					buckets[i].processorOn = true;
 					return true; 
-            	}
+				}
 				else
-				{
+			{
 					printk(KERN_ERR "Failed to turn on processor in increase bucket count%d\n", i);
 				}
 			}
 			else
-			{
+		{
 				buckets[i].processorOn = true;
 				printk(KERN_ERR "processor %d is already on in in increased bucket count!\n", i);
 				return true;
@@ -82,7 +82,7 @@ void turnOffUnusedProcessors(void) {
 				}
 			}
 			else
-			{
+		{
 				buckets[i].processorOn = false;
 				printk(KERN_ERR "processor %d is already off!\n", i);
 			}
@@ -99,7 +99,7 @@ int turnOnProcessor(int cpu)
 		buckets[cpu].processorOn = true;
 	}
 	else
-	{
+{
 		//turn on cpu if not online
 		if (!cpu_up(cpu)) {
 			buckets[cpu].processorOn = true; // Successfully turned on
@@ -181,7 +181,7 @@ bool response_time_test(struct bucket_info *bucket, struct bucket_task_ll *task)
 	// Assume response_time_test passes for all tasks in bucket
 	u32 new, old;
 	struct bucket_task_ll *search;
-	
+
 	// Phase 1 - Check it's possible to admit the new task
 	new = rt_accumulate_init(bucket, task);
 	do {
@@ -203,7 +203,7 @@ bool response_time_test(struct bucket_info *bucket, struct bucket_task_ll *task)
 				new += rt_ceil_div(old, task->period) * task->cost;
 			}
 		} while (new != old);
-		
+
 		search = search->next;
 	}
 
@@ -367,7 +367,7 @@ void add_task_to_bucket(struct bucket_info *bucket, struct bucket_task_ll *task)
 	}
 
 	// TODO: Pin tid to processor
-	
+
 	bucket->num_tasks++;
 	bucket->running_util += task->util;
 	turnOffUnusedProcessors();
@@ -375,48 +375,48 @@ void add_task_to_bucket(struct bucket_info *bucket, struct bucket_task_ll *task)
 
 // Task must be in bucket
 void remove_task_from_bucket(pid_t tid, int bucket_no) {
-    struct bucket_info *bucket;
-    struct bucket_task_ll *prev = NULL, *search;
+	struct bucket_info *bucket;
+	struct bucket_task_ll *prev = NULL, *search;
 
 	printk(KERN_INFO "Trying to remove task id %d from bucket %d!\n",tid,bucket_no);
 
-    if (bucket_no >= MAX_PROCESSORS) {
-        printk(KERN_ERR "Invalid bucket number: %d\n", bucket_no);
-        return;
-    }
+	if (bucket_no >= MAX_PROCESSORS) {
+		printk(KERN_ERR "Invalid bucket number: %d\n", bucket_no);
+		return;
+	}
 
-    bucket = &buckets[bucket_no];
-    search = bucket->first_task;
+	bucket = &buckets[bucket_no];
+	search = bucket->first_task;
 
-    if (!search) {
-        printk(KERN_ERR "Bucket %d is empty, cannot remove task %d\n", bucket_no, tid);
-        return;
-    }
+	if (!search) {
+		printk(KERN_ERR "Bucket %d is empty, cannot remove task %d\n", bucket_no, tid);
+		return;
+	}
 
-    // Check if the first task is the one to remove
-    if (search->tid == tid) {
-        bucket->first_task = search->next; // Update the head of the list
-        bucket->running_util -= search->util;
-        bucket->num_tasks--;
-        kfree(search); // Free the removed task node
-        return;
-    }
+	// Check if the first task is the one to remove
+	if (search->tid == tid) {
+		bucket->first_task = search->next; // Update the head of the list
+		bucket->running_util -= search->util;
+		bucket->num_tasks--;
+		kfree(search); // Free the removed task node
+		return;
+	}
 
-    // Traverse the list to find the task
-    while (search && search->tid != tid) {
-        prev = search;
-        search = search->next;
-    }
+	// Traverse the list to find the task
+	while (search && search->tid != tid) {
+		prev = search;
+		search = search->next;
+	}
 
-    if (search && search->tid == tid) {
-        // Found the task, remove it from the list
-        prev->next = search->next;
-        bucket->running_util -= search->util;
-        bucket->num_tasks--;
-        kfree(search); // Free the removed task node
-    } else {
-        printk(KERN_ERR "Task %d not found in bucket %u\n", tid, bucket_no);
-    }
+	if (search && search->tid == tid) {
+		// Found the task, remove it from the list
+		prev->next = search->next;
+		bucket->running_util -= search->util;
+		bucket->num_tasks--;
+		kfree(search); // Free the removed task node
+	} else {
+		printk(KERN_ERR "Task %d not found in bucket %u\n", tid, bucket_no);
+	}
 }
 
 // Returns processor task was assigned into
@@ -465,16 +465,16 @@ s8 insert_bucket(struct timespec C, struct timespec T, pid_t tid,  int cpuid)
 	if(check_util(&buckets[bucket],newTask))
 	{
 		if (bucket>= 0 && bucket< MAX_PROCESSORS) {
-				turnOnProcessor(bucket);
-				add_task_to_bucket(&buckets[bucket], newTask);
-				printk(KERN_INFO "Able to insert %d\n", newTask->tid);
+			turnOnProcessor(bucket);
+			add_task_to_bucket(&buckets[bucket], newTask);
+			printk(KERN_INFO "Able to insert %d\n", newTask->tid);
 		} else {
 			printk(KERN_ERR "Failed to insert task %d\n", newTask->tid);
 		}
 		return 0;
 	}
 	else
-	{
+{
 		printk(KERN_ERR "Failed to insert due to check util, cpu will be over utilized for %d!\n", newTask->tid);
 		return -1;
 	}
@@ -515,7 +515,7 @@ static ssize_t partition_show(struct kobject *kobj, struct kobj_attribute *attr,
 // Reading 'enabled' attribute - shows if monitoring is active or not
 static ssize_t partition_set(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count) 
 {
-    if(buf[0] == 'F' && buf[1] == 'F')
+	if(buf[0] == 'F' && buf[1] == 'F')
 	{
 		algo = FF;
 		return count;
@@ -546,7 +546,7 @@ static ssize_t partition_set(struct kobject *kobj, struct kobj_attribute *attr, 
 		return count;
 	}
 	else
-	{
+{
 		printk(KERN_INFO "Invalid Partition policy!\n");
 		return count;
 	}
@@ -560,15 +560,15 @@ void partition_init(void)
 {
 	int error = 0;
 
-    //make sure the rtes directory exist!
-    if(rtes_kobject != NULL)
-    {
-        error = sysfs_create_file(rtes_kobject, &partition_attribute.attr);
-        if(error)
-        {
-            printk(KERN_INFO "Unable to create the reservation status file!\n"); 
-        }
-    }
+	//make sure the rtes directory exist!
+	if(rtes_kobject != NULL)
+	{
+		error = sysfs_create_file(rtes_kobject, &partition_attribute.attr);
+		if(error)
+		{
+			printk(KERN_INFO "Unable to create the reservation status file!\n"); 
+		}
+	}
 }
 
 void partition_exit(void)
