@@ -3,6 +3,7 @@
 #include <linux/slab.h>
 #include <linux/time.h>
 #include <linux/cpu.h>
+#include <linux/math64.h>
 
 #define MAX_PROCESSORS 4
 
@@ -14,9 +15,9 @@ enum fit_algo {FF, NF, BF, WF, PA, LST};
 struct bucket_task_ll {
 	struct bucket_task_ll *next;
 	pid_t tid;
-	u32 cost;
-	u32 period;
-	u16 util;
+	s64 cost;
+	s64 period;
+	s64 util;
 };
 
 struct bucket_info {
@@ -41,7 +42,7 @@ bool increase_bucket_count(void) {
 		if (!buckets[i].processorOn) {
 			printk(KERN_INFO "Turning on processor %d in increased bucket count\n", i);
 
-			if (cpu_online(i))
+			if (!cpu_online(i))
 			{
 				if(!cpu_up(i)) {
                 	printk(KERN_INFO "Processor %d successfully turned on in increase bucket count\n", i);
@@ -56,7 +57,7 @@ bool increase_bucket_count(void) {
 			else
 			{
 				buckets[i].processorOn = true;
-				printk(KERN_ERR "processor %d is already off in in increased bucket count!\n", i);
+				printk(KERN_ERR "processor %d is already on in in increased bucket count!\n", i);
 				return true;
 			}
 		}
@@ -257,12 +258,12 @@ s8 find_NF(struct bucket_task_ll *task) {
 }
 
 s8 find_BF(struct bucket_task_ll *task) {
-	s16 best_utilization = -1;
+	s64 best_utilization = -1;
 	s8 best_utilized_bucket = -1;
 	s8 i;
 	printk(KERN_INFO "Doing BF bin packing!\n");
 	for(i = 0; i < MAX_PROCESSORS; i++) {
-		if ((s16) buckets[i].running_util > best_utilization) {
+		if ((s64) buckets[i].running_util > best_utilization) {
 			if (buckets[i].processorOn && check_util(&buckets[i], task)) {
 				best_utilized_bucket = i;
 				best_utilization = buckets[i].running_util;
@@ -275,7 +276,7 @@ s8 find_BF(struct bucket_task_ll *task) {
 
 s8 find_WF(struct bucket_task_ll *task) {
 	s8 least_utilized_bucket = -1;
-	s16 least_utilization = 1001;
+	s64 least_utilization = 1001;
 	s8 i;
 	printk(KERN_INFO "Doing WF bin packing!\n");
 	for(i = 0; i < MAX_PROCESSORS; i++) {
@@ -296,6 +297,7 @@ s8 find_PA(struct bucket_task_ll *task) {
 	struct bucket_task_ll *tmp;
 	u16 computed_util;
 	s8 i;
+	s32 remainder;
 	bool valid;
 	printk(KERN_INFO "Doing PA bin packing!\n");
 	for(i = 0; i < MAX_PROCESSORS; i++) {
@@ -304,9 +306,11 @@ s8 find_PA(struct bucket_task_ll *task) {
 		valid = true;
 		while(tmp) {
 			if (tmp->period > task->period) {
-				valid = (tmp->period % task->period == 0);
+				div_u64_rem(tmp->period,task->period,&remainder);
+				valid = (remainder == 0);
 			} else {
-				valid = (task->period % tmp->period == 0);
+				div_u64_rem(task->period,tmp->period,&remainder);
+				valid = (remainder== 0);
 			}
 
 			if (!valid) break;
@@ -412,7 +416,7 @@ s8 insert_task(struct threadNode *task) {
 	newTask->cost = timespec_to_ns(&task->C);
 	newTask->period = timespec_to_ns(&task->T);
 
-	newTask->util = (u16) ((newTask->cost * 1000) / newTask->period);
+	newTask->util = div64_s64(newTask->cost * 1000,newTask->period);
 	bucket = find_bucket(newTask);
 	if (bucket < 0) {
 		if (!increase_bucket_count()) {
@@ -438,7 +442,7 @@ void print_buckets() {
 		printk(KERN_INFO"[%d] %d Tasks: %d total util\n", i, buckets[i].num_tasks, buckets[i].running_util);
 		tmp = buckets[i].first_task;
 		while (tmp) {
-			printk(KERN_INFO "\t[%d]: (%d, %d) util .%d\n", tmp->tid, tmp->cost, tmp->period, tmp->util);
+			printk(KERN_INFO "\t[%d]: (%lld, %lld) util .%lld\n", tmp->tid, tmp->cost, tmp->period, tmp->util);
 			tmp = tmp->next;
 		}
 	}

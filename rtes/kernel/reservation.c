@@ -321,7 +321,8 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 			{
 				printk(KERN_INFO "No active reservations!\n");
 				kfree(node);
-				return EBUSY;
+				output = -EBUSY;
+				break;
 			}
 			printk(KERN_INFO "was able to insert task in cpu %d!\n", node->cpuid);
 		}
@@ -348,6 +349,7 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 
 	} while (0);
 	debugPrints();
+	print_buckets();
 
 	// threadHead.need_housekeeping = true;
 	unlockScheduleLL();
@@ -371,6 +373,7 @@ SYSCALL_DEFINE1(cancel_reserve, pid_t, tid)
 	lockScheduleLL();
 	output = removeThreadInScheduleLL(tid);
 	debugPrints();
+	print_buckets();
 	unlockScheduleLL();
 
 
