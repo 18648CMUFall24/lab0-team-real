@@ -4264,45 +4264,42 @@ void handle_rt_task_state_updates() {
 	if (!rtes_needs_housekeeping()) return;
 
 	lockScheduleLL();
-	printk(KERN_ERR "A");
 	loopedThread = getFirstThreadNode();
-	printk(KERN_ERR "B");
 	while(loopedThread != NULL) {
-		if (loopedThread->task != NULL) {
-			switch(loopedThread->state) {
-				case MAKE_SUSPEND:
-					printk(KERN_ERR "C");
-					rq = task_rq_lock(loopedThread->task, &rq_flags);
-					printk(KERN_ERR "D");
-					deactivate_task(rq, loopedThread->task, TASK_UNINTERRUPTIBLE);
-					printk(KERN_ERR "E");
-					task_rq_unlock(rq, loopedThread->task, &rq_flags);
-					printk(KERN_ERR "F");
-					loopedThread->state = SUSPENDED;
-					printk(KERN_ERR "G");
-					break;
-				case MAKE_RUNNABLE:
-					printk(KERN_ERR "H");
-					wake_up_process(loopedThread->task);
-					printk(KERN_ERR "I");
-					loopedThread->state = RUNNABLE;
-					printk(KERN_ERR "J");
-					break;
-				default:
-					break;
-			}
+		if (loopedThread->task == NULL) {
+			printk(KERN_ERR "Task %d isn't linked properly to a task_struct", loopedThread->tid);
+			loopedThread = loopedThread->next;
+			continue;
 		}
 
-		
-		printk(KERN_ERR "K");
+		switch(loopedThread->state) {
+			case MAKE_SUSPEND:
+				printk(KERN_ERR "Suspending task %d ", loopedThread->tid);
+				rq = task_rq_lock(loopedThread->task, &rq_flags);
+				// loopedThread->task->state = TASK_UNINTERRUPTIBLE;
+				deactivate_task(rq, loopedThread->task, DEQUEUE_SLEEP);
+				task_rq_unlock(rq, loopedThread->task, &rq_flags);
+				loopedThread->state = SUSPENDED;
+				break;
+			case MAKE_RUNNABLE:
+				printk(KERN_ERR "Making task %d runnable", loopedThread->tid);
+				rq = task_rq_lock(loopedThread->task, &rq_flags);
+				// wake_up_process(loopedThread->task);
+				// loopedThread->task->state = TASK_RUNNING;
+				enqueue_task(rq, loopedThread->task, ENQUEUE_WAKEUP);
+				check_preempt_curr(rq, loopedThread->task, 0);
+				task_rq_unlock(rq, loopedThread->task, &rq_flags);
+				loopedThread->state = RUNNABLE;
+			default:
+				break;
+		}
+
+
 		loopedThread = loopedThread->next;
 	}
 
-	printk(KERN_ERR "L");
 	rtes_done_housekeeping();
-	printk(KERN_ERR "M");
 	unlockScheduleLL();
-	printk(KERN_ERR "N");
 }
 
 /*

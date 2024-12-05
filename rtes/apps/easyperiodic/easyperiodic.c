@@ -15,10 +15,6 @@
 const uint64_t CLOCKS_PER_MSEC = (uint64_t)CLOCKS_PER_SEC / 1000;
 const uint64_t CLOCKS_PER_NSEC = (uint64_t)CLOCKS_PER_SEC / 1000000000;
 
-void handle_sigexcess() {
-    printf("SIGEXCESS recieved\n");
-    exit(-1);
-}
 
 // Main function: entry point for execution
 int main(int argc, char *argv[]) {
@@ -34,6 +30,7 @@ int main(int argc, char *argv[]) {
     int tArg = atoi(argv[2]);
     int cpuArg = atoi(argv[3]);
 
+    printf("Scheduling new task (%d, %d) on processor %d\n", cArg, tArg, cpuArg);
 
     if (tArg < cArg) {
         perror("Period less than Execution Budget");
@@ -43,38 +40,42 @@ int main(int argc, char *argv[]) {
     uint64_t clocks_running = cArg * CLOCKS_PER_MSEC;
 
     time_t cost_s = cArg / 1000;
-    long int cost_ns = (cArg % 1000) * 1000000000;
+    long int cost_ns = ((long int) cArg % 1000);
+    printf("Cost: %d s %ld ms\n", cost_s, cost_ns);
+    cost_ns *= 1000000;
+    printf("Cost: %d s %ld ns\n", cost_s, cost_ns);
 
     time_t period_s = tArg / 1000;
-    long int period_ns = (tArg % 1000) * 1000000000;
-
-    signal(SIGEXCESS, handle_sigexcess);
+    long int period_ns = ((long int) tArg % 1000);
+    printf("Cost: %d s %ld ms\n", period_s, period_ns);
+    period_ns *= 1000000;
+    printf("Cost: %d s %ld ms\n", period_s, period_ns);
 
     cost.tv_sec = cost_s;
-    cost.tv_nsec = cost_ns + 5000000; // Give an extra half ms of buffer
+    cost.tv_nsec = cost_ns + 10000000; // Give an extra ms of buffer
     period.tv_sec = period_s;
     period.tv_nsec = period_ns;
 
-    printf("Cost: %d s %ld ns\n", cost_s, cost_ns);
-    printf("Period: %d s %ld ns\n", period_s, period_ns);
+    printf("Real Cost: %d s %ld ns\n", cost_s, cost_ns);
+    printf("Real Period: %d s %ld ns\n", period_s, period_ns);
 
     set_reserve(0, &cost, &period, cpuArg);
 
-    while(1)
-    {
+    while(1) {
         clock_t start = clock();
         clock_t clocks_periodElapsedTime = 0;
 
         printf("Started period...");
         fflush(stdout);
 
-        //pretend to do busy work
+        // pretend to do busy work
         while(clocks_periodElapsedTime < clocks_running)
         {
             clocks_periodElapsedTime = (clock() - start);
         }
 
         printf("finished work.\n");
+        fflush(stdout);
         end_job();
     }
 
