@@ -226,7 +226,7 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 		return -EFAULT;
 	}
 
-
+	
 
 	if (!task) {
 		rcu_read_lock();
@@ -306,6 +306,7 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 		
 		memset(node->dataBuffer,0,BUFFER_SIZE);
 		node->offset = 0;
+		node->cpuid = cpuid;
 
 
 		// Creating thread utilziation file if nodes is not already exist
@@ -314,29 +315,25 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 		}
 		
 
-		if(cpuid == -1)
-		{
-			node->cpuid = insert_task(node);
-			if(node->cpuid == -1)
-			{
+		if(cpuid == -1) {
+			node->cpuid = insert_task(node->C, node->T, node->tid);
+			if(node->cpuid == -1) {
 				printk(KERN_INFO "No active reservations!\n");
 				kfree(node);
 				output = -EBUSY;
 				break;
 			}
 			printk(KERN_INFO "was able to insert task in cpu %d!\n", node->cpuid);
-		}
-		else
-		{
+		} else {
 			node->cpuid = cpuid;
-			if(insert_bucket(node) == -1)
-			{
+			if(insert_bucket(node->C,node->T,node->tid,node->cpuid) == -1) {
 				kfree(node);
 				output = -EBUSY;
 				break;
 			}
 			printk(KERN_INFO "was able to insert task in cpu %d!\n", node->cpuid);
 		}
+
 		//Setting up CPU affinity using syscall for sched_setaffinity
 		cpumask_clear(&cpumask);
 		cpumask_set_cpu(node->cpuid, &cpumask);
@@ -344,7 +341,8 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 		//bin TID against a specific CPU
 		if(sched_setaffinity(node->tid, &cpumask) == -1) {
 			printk(KERN_INFO "Error in setting cpu!\n");
-			return -1;
+			output = -1;
+			break;
 		}
 
 		// start the timer
@@ -423,6 +421,7 @@ SYSCALL_DEFINE0(end_job) {
 
 	set_tsk_need_resched(current);
 
+	turnOffUnusedProcessors();
 	return output;
 }
 
@@ -438,7 +437,7 @@ struct threadNode *findThreadInScheduleLL(pid_t tid){
 
 		loopedThread = loopedThread->next;
 	}
-
+	
 	return loopedThread;
 }
 

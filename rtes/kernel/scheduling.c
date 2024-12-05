@@ -374,47 +374,61 @@ void add_task_to_bucket(struct bucket_info *bucket, struct bucket_task_ll *task)
 }
 
 // Task must be in bucket
-void remove_task_from_bucket(pid_t tid, u8 bucket_no) {
-	struct bucket_info *bucket;
-	struct bucket_task_ll *prev, *search;
+void remove_task_from_bucket(pid_t tid, int bucket_no) {
+    struct bucket_info *bucket;
+    struct bucket_task_ll *prev = NULL, *search;
 
-	if (bucket_no >= MAX_PROCESSORS) return;
+	printk(KERN_INFO "Trying to remove task id %d from bucket %d!\n",tid,bucket_no);
 
-	bucket = &buckets[bucket_no];
+    if (bucket_no >= MAX_PROCESSORS) {
+        printk(KERN_ERR "Invalid bucket number: %d\n", bucket_no);
+        return;
+    }
 
-	prev = bucket->first_task;
-	search = bucket->first_task;
+    bucket = &buckets[bucket_no];
+    search = bucket->first_task;
 
-	if (prev->tid == tid) {
-		bucket->first_task = buckets->first_task->next;
-	}
+    if (!search) {
+        printk(KERN_ERR "Bucket %d is empty, cannot remove task %d\n", bucket_no, tid);
+        return;
+    }
 
-	while (search && search->tid != tid) {
-		prev = search;
-		search = search->next;
-	}
+    // Check if the first task is the one to remove
+    if (search->tid == tid) {
+        bucket->first_task = search->next; // Update the head of the list
+        bucket->running_util -= search->util;
+        bucket->num_tasks--;
+        kfree(search); // Free the removed task node
+        return;
+    }
 
-	if (search && (search->tid == tid)) {
-		prev->next = search->next;
-		bucket->running_util -= search->util;
-		bucket->num_tasks--;
-	} else {
-		printk(KERN_ERR "Failed to remove task from processor, are you sure it's in the right bucket?");
-	}
+    // Traverse the list to find the task
+    while (search && search->tid != tid) {
+        prev = search;
+        search = search->next;
+    }
 
-	turnOffUnusedProcessors();
+    if (search && search->tid == tid) {
+        // Found the task, remove it from the list
+        prev->next = search->next;
+        bucket->running_util -= search->util;
+        bucket->num_tasks--;
+        kfree(search); // Free the removed task node
+    } else {
+        printk(KERN_ERR "Task %d not found in bucket %u\n", tid, bucket_no);
+    }
 }
 
 // Returns processor task was assigned into
 // Upon failure returns a negative number
-s8 insert_task(struct threadNode *task) {
+s8 insert_task(struct timespec C, struct timespec T, pid_t tid) {
 	struct bucket_task_ll *newTask;
 	s8 bucket;
 
 	newTask = (struct bucket_task_ll *) kmalloc(sizeof(struct bucket_task_ll), GFP_KERNEL); 
-	newTask->tid = task->tid;
-	newTask->cost = timespec_to_ns(&task->C);
-	newTask->period = timespec_to_ns(&task->T);
+	newTask->tid = tid;
+	newTask->cost = timespec_to_ns(&C);
+	newTask->period = timespec_to_ns(&T);
 
 	newTask->util = div64_s64(newTask->cost * 1000,newTask->period);
 	bucket = find_bucket(newTask);
@@ -435,22 +449,23 @@ s8 insert_task(struct threadNode *task) {
 	return bucket;
 }
 
-s8 insert_bucket(struct threadNode *task)
+s8 insert_bucket(struct timespec C, struct timespec T, pid_t tid,  int cpuid)
 {
 	struct bucket_task_ll *newTask;
 	s8 bucket;
 
 	newTask = (struct bucket_task_ll *) kmalloc(sizeof(struct bucket_task_ll), GFP_KERNEL); 
-	newTask->tid = task->tid;
-	newTask->cost = timespec_to_ns(&task->C);
-	newTask->period = timespec_to_ns(&task->T);
-	bucket = task->cpuid;
+	newTask->tid = tid;
+	newTask->cost = timespec_to_ns(&C);
+	newTask->period = timespec_to_ns(&T);
+	bucket = cpuid;
 
 	newTask->util = div64_s64(newTask->cost * 1000,newTask->period);
 
 	if(check_util(&buckets[bucket],newTask))
 	{
 		if (bucket>= 0 && bucket< MAX_PROCESSORS) {
+				turnOnProcessor(bucket);
 				add_task_to_bucket(&buckets[bucket], newTask);
 				printk(KERN_INFO "Able to insert %d\n", newTask->tid);
 		} else {
@@ -477,6 +492,8 @@ void print_buckets() {
 			tmp = tmp->next;
 		}
 	}
+
+	printk(KERN_INFO "\n\n");
 }
 
 // Reading 'enabled' attribute - shows if monitoring is active or not

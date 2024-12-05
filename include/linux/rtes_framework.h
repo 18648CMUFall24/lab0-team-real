@@ -75,14 +75,15 @@ bool rtes_head_is_init(void);
 bool rtes_needs_housekeeping(void);
 void rtes_done_housekeeping(void);
 struct threadNode *getFirstThreadNode(void);
-void partion_init(void);
-void partion_exit(void);
+void partition_init(void);
+void partition_exit(void);
 void lockScheduleLL(void);
 void unlockScheduleLL(void);
 void rtesScheduleTask(struct task_struct *task);
 void rtesDescheduleTask(struct task_struct *task);
 void energyCalc(struct threadNode *task);
 void energyCalc_init(void);
+void turnOffUnusedProcessors(void); 
 struct threadNode *findThreadInScheduleLL(pid_t tid);
 int removeThreadInScheduleLL(pid_t tid);
 void handle_rt_task_state_updates(void);
@@ -93,9 +94,9 @@ int removeEnergyThreadFile(struct threadNode *thread);
 int turnOnProcessor(int cpu);
 
 
-void remove_task_from_bucket(pid_t tid, u8 bucket_no);
-s8 insert_task(struct threadNode *task);
-s8 insert_bucket(struct threadNode *task);
+void remove_task_from_bucket(pid_t tid, int bucket_no);
+s8 insert_task(struct timespec C, struct timespec T, pid_t tid);
+s8 insert_bucket(struct timespec C, struct timespec T, pid_t tid, int cpuid);
 void print_buckets(void);
 
 int structured_calc(
