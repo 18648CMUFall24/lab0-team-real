@@ -428,11 +428,42 @@ s8 insert_task(struct threadNode *task) {
 	if (bucket >= 0 && bucket < MAX_PROCESSORS) {
 		add_task_to_bucket(&buckets[bucket], newTask);
 	} else {
-		printk(KERN_ERR "Failed to insert task %d", newTask->tid);
+		printk(KERN_ERR "Failed to insert task %d\n", newTask->tid);
 	}
 
 	// Syscall to assign task to bucket here
 	return bucket;
+}
+
+s8 insert_bucket(struct threadNode *task)
+{
+	struct bucket_task_ll *newTask;
+	s8 bucket;
+
+	newTask = (struct bucket_task_ll *) kmalloc(sizeof(struct bucket_task_ll), GFP_KERNEL); 
+	newTask->tid = task->tid;
+	newTask->cost = timespec_to_ns(&task->C);
+	newTask->period = timespec_to_ns(&task->T);
+	bucket = task->cpuid;
+
+	newTask->util = div64_s64(newTask->cost * 1000,newTask->period);
+
+	if(check_util(&buckets[bucket],newTask))
+	{
+		if (bucket>= 0 && bucket< MAX_PROCESSORS) {
+				add_task_to_bucket(&buckets[bucket], newTask);
+				printk(KERN_INFO "Able to insert %d\n", newTask->tid);
+		} else {
+			printk(KERN_ERR "Failed to insert task %d\n", newTask->tid);
+		}
+		return 0;
+	}
+	else
+	{
+		printk(KERN_ERR "Failed to insert due to check util, cpu will be over utilized for %d!\n", newTask->tid);
+		return -1;
+	}
+
 }
 
 void print_buckets() {

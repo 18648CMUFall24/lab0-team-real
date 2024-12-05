@@ -95,6 +95,7 @@ int turnOnProcessor(int cpu);
 
 void remove_task_from_bucket(pid_t tid, u8 bucket_no);
 s8 insert_task(struct threadNode *task);
+s8 insert_bucket(struct threadNode *task);
 void print_buckets(void);
 
 int structured_calc(

@@ -329,6 +329,13 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 		else
 		{
 			node->cpuid = cpuid;
+			if(insert_bucket(node) == -1)
+			{
+				kfree(node);
+				output = -EBUSY;
+				break;
+			}
+			printk(KERN_INFO "was able to insert task in cpu %d!\n", node->cpuid);
 		}
 		//Setting up CPU affinity using syscall for sched_setaffinity
 		cpumask_clear(&cpumask);
