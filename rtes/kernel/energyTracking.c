@@ -101,8 +101,8 @@ void energyCalc(struct threadNode *task)
         //Convert to watt
         elapsed_time_seconds = div64_u64(elapsed_time,1000);
         elapsed_timeMonitor_seconds =div64_u64(elapsed_timeMonitor,1000);
-        printk(KERN_INFO "Thread ran: %lu kHz\n", elapsed_time_seconds);
-        printk(KERN_INFO "Monitor session ran: %lu kHz\n", elapsed_timeMonitor_seconds);
+        //printk(KERN_INFO "Thread ran: %lu kHz\n", elapsed_time_seconds);
+        //printk(KERN_INFO "Monitor session ran: %lu kHz\n", elapsed_timeMonitor_seconds);
 
         
         //set Previous energy
@@ -111,11 +111,11 @@ void energyCalc(struct threadNode *task)
         //calculate energy
         task->energyData.energy = elapsed_time_seconds * Power;
         calcEnergy = elapsed_timeMonitor_seconds * Power;
-        printk(KERN_INFO "Energy calculated for thread is: %lu mJ\n", task->energyData.energy);
+        //printk(KERN_INFO "Energy calculated for thread is: %lu mJ\n", task->energyData.energy);
 
         //calculate the difference 
         diff = calcEnergy - prevEnergy;
-        printk(KERN_INFO "Energy difference for thread is: %lu mJ\n", diff);
+        //printk(KERN_INFO "Energy difference for thread is: %lu mJ\n", diff);
     
         //Increment Total Energy
         TotalEnergy += diff;
