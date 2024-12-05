@@ -232,6 +232,7 @@ bool check_util(struct bucket_info *bucket, struct bucket_task_ll *task) {
 
 s8 find_FF(struct bucket_task_ll *task) {
 	s8 i = 0;
+	printk(KERN_INFO "Doing FF bin packing!\n");
 	for(i = 0; i < MAX_PROCESSORS; i++) {
 		if (buckets[i].processorOn && check_util(&buckets[i], task)) {
 			return i;
@@ -243,6 +244,7 @@ s8 find_FF(struct bucket_task_ll *task) {
 s8 find_NF(struct bucket_task_ll *task) {
 	static u32 next_bucket = 0;
 	s8 i;
+	printk(KERN_INFO "Doing NF bin packing!\n");
 	for(i = 0; i < MAX_PROCESSORS; i++) {
 		if (buckets[next_bucket].processorOn && check_util(&buckets[next_bucket], task)) {
 			return  next_bucket;
@@ -258,7 +260,7 @@ s8 find_BF(struct bucket_task_ll *task) {
 	s16 best_utilization = -1;
 	s8 best_utilized_bucket = -1;
 	s8 i;
-
+	printk(KERN_INFO "Doing BF bin packing!\n");
 	for(i = 0; i < MAX_PROCESSORS; i++) {
 		if ((s16) buckets[i].running_util > best_utilization) {
 			if (buckets[i].processorOn && check_util(&buckets[i], task)) {
@@ -275,7 +277,7 @@ s8 find_WF(struct bucket_task_ll *task) {
 	s8 least_utilized_bucket = -1;
 	s16 least_utilization = 1001;
 	s8 i;
-
+	printk(KERN_INFO "Doing WF bin packing!\n");
 	for(i = 0; i < MAX_PROCESSORS; i++) {
 		if (buckets[i].processorOn && buckets[i].running_util < least_utilization) {
 			least_utilized_bucket = i;
@@ -295,7 +297,7 @@ s8 find_PA(struct bucket_task_ll *task) {
 	u16 computed_util;
 	s8 i;
 	bool valid;
-
+	printk(KERN_INFO "Doing PA bin packing!\n");
 	for(i = 0; i < MAX_PROCESSORS; i++) {
 		if (!buckets[i].processorOn) continue;
 		tmp = buckets[i].first_task;
@@ -322,6 +324,7 @@ s8 find_PA(struct bucket_task_ll *task) {
 
 s8 find_LST(struct bucket_task_ll *task) {
 	increase_bucket_count();
+	printk(KERN_INFO "Doing LST bin packing!\n");
 	return find_WF(task);
 }
 
