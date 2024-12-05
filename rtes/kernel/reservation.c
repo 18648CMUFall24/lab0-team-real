@@ -73,7 +73,7 @@ static enum hrtimer_restart end_of_reserved_time(struct hrtimer *timer) {
 	task->task->state = TASK_UNINTERRUPTIBLE;
 	threadHead.need_housekeeping = true;
 
-	set_tsk_need_resched(current);
+	//set_tsk_need_resched(current);
 	return HRTIMER_NORESTART;
 }
 
@@ -128,7 +128,7 @@ static enum hrtimer_restart restart_period(struct hrtimer *timer) {
 
 	hrtimer_forward_now(timer, task->periodDuration);
 
-	set_tsk_need_resched(current);
+	//set_tsk_need_resched(current);
 	return HRTIMER_RESTART;
 }
 

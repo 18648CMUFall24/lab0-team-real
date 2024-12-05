@@ -47,8 +47,10 @@ int main(int argc, char *argv[]) {
     long int period_ns = ((long int) tArg % 1000);
     period_ns *= 1000000;
 
+    // Give an extra 50 ms of buffer on the cost
+    // so that end_job can do it's magic without race condition from enforcer
     cost.tv_sec = cost_s;
-    cost.tv_nsec = cost_ns + 10000000; // Give an extra couple ms of buffer
+    cost.tv_nsec = cost_ns + 50000000; 
     period.tv_sec = period_s;
     period.tv_nsec = period_ns;
 

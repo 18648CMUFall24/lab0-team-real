@@ -4274,7 +4274,7 @@ void handle_rt_task_state_updates() {
 
 		switch(loopedThread->state) {
 			case MAKE_SUSPEND:
-				//printk(KERN_ERR "Suspending task %d ", loopedThread->tid);
+				printk(KERN_ERR "Suspending task %d ", loopedThread->tid);
 				rq = task_rq_lock(loopedThread->task, &rq_flags);
 				// loopedThread->task->state = TASK_UNINTERRUPTIBLE;
 				deactivate_task(rq, loopedThread->task, DEQUEUE_SLEEP);
@@ -4282,7 +4282,7 @@ void handle_rt_task_state_updates() {
 				loopedThread->state = SUSPENDED;
 				break;
 			case MAKE_RUNNABLE:
-				//printk(KERN_ERR "Making task %d runnable", loopedThread->tid);
+				printk(KERN_ERR "Making task %d runnable", loopedThread->tid);
 				rq = task_rq_lock(loopedThread->task, &rq_flags);
 				// wake_up_process(loopedThread->task);
 				// loopedThread->task->state = TASK_RUNNING;
@@ -4292,7 +4292,7 @@ void handle_rt_task_state_updates() {
 				loopedThread->state = RUNNABLE;
 				break;
 			case DEAD:
-				//printk(KERN_ERR "Removing dead thread %d", loopedThread->tid);
+				printk(KERN_ERR "Removing dead thread %d", loopedThread->tid);
 				removeThreadInScheduleLL(loopedThread->tid);
 				break;
 			default:
