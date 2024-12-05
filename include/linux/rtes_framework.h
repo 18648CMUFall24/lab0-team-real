@@ -90,6 +90,7 @@ int createThreadFile(struct threadNode  *thread);
 int removeThreadFile(struct threadNode  *thread);
 int createEnergyThreadFile(struct threadNode *thread);
 int removeEnergyThreadFile(struct threadNode *thread);
+int turnOnProcessor(int cpu);
 
 
 void remove_task_from_bucket(pid_t tid, u8 bucket_no);

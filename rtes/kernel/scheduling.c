@@ -2,6 +2,7 @@
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/time.h>
+#include <linux/cpu.h>
 
 #define MAX_PROCESSORS 4
 
@@ -38,9 +39,26 @@ bool increase_bucket_count(void) {
 
 	for(i = 1; i < MAX_PROCESSORS; i++) {
 		if (!buckets[i].processorOn) {
-			printk(KERN_INFO "Turning on processor %d", i);
-			buckets[i].processorOn = true;
-			return true;
+			printk(KERN_INFO "Turning on processor %d in increased bucket count\n", i);
+
+			if (cpu_online(i))
+			{
+				if(!cpu_up(i)) {
+                	printk(KERN_INFO "Processor %d successfully turned on in increase bucket count\n", i);
+                	buckets[i].processorOn = true;
+					return true; 
+            	}
+				else
+				{
+					printk(KERN_ERR "Failed to turn on processor in increase bucket count%d\n", i);
+				}
+			}
+			else
+			{
+				buckets[i].processorOn = true;
+				printk(KERN_ERR "processor %d is already off in in increased bucket count!\n", i);
+				return true;
+			}
 		}
 	}
 
@@ -51,12 +69,48 @@ void turnOffUnusedProcessors(void) {
 	u8 i;
 	for(i = 1; i < MAX_PROCESSORS; i++) {
 		if (buckets[i].num_tasks == 0 && buckets[i].processorOn) {
-			printk(KERN_ERR "Processsor %d is on with no rt processes running...Turning off", i);
-			buckets[i].processorOn = false;
+			printk(KERN_ERR "Processsor %d is on with no rt processes running...Turning off\n", i);
+			if (cpu_online(i))
+			{
+				// Attempt to bring the processor offline
+				if (!cpu_down(i)) {
+					buckets[i].processorOn = false; // Successfully turned off
+					printk(KERN_INFO "Processor %d successfully turned off\n", i);
+				} else {
+					printk(KERN_ERR "Failed to turn off processor %d\n", i);
+				}
+			}
+			else
+			{
+				buckets[i].processorOn = false;
+				printk(KERN_ERR "processor %d is already off!\n", i);
+			}
 		}
 	}
 }
 
+int turnOnProcessor(int cpu)
+{
+	//check to see if cpu is already online
+	if(cpu_online(cpu))
+	{
+		printk(KERN_ERR "processor %d is already on!\n", cpu);
+		buckets[cpu].processorOn = true;
+	}
+	else
+	{
+		//turn on cpu if not online
+		if (!cpu_up(cpu)) {
+			buckets[cpu].processorOn = true; // Successfully turned on
+			printk(KERN_INFO "Processor %d successfully turned on\n", cpu);
+		} else {
+			printk(KERN_ERR "Failed to turn off processor %d\n", cpu);
+			return -1;
+		}
+	}
+
+	return 0;
+}
 
 bool check_util_PA(u32 util) {
 	return util <= 1000;
