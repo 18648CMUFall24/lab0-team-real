@@ -195,7 +195,7 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 
 	printk(KERN_NOTICE "sys_set_reserve");
 
-	if (cpuid < 0 || cpuid > 3) {
+	if (cpuid < -1 || cpuid > 3) {
 		printk(KERN_INFO "CPU ID does not exist!\n");
 		return EINVAL;
 	}
@@ -244,6 +244,39 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 
 	if (!task) {
 		return -EFAULT;
+	}
+
+	//try to set the affinity
+	if(cpuid == -1) 
+	{
+		cpuid = insert_task(c, t, tid);
+		if(cpuid == -1) 
+		{
+			printk(KERN_INFO "No active reservations!\n");
+			return -EBUSY;
+		}
+		printk(KERN_INFO "was able to insert task %d in cpu %d!\n", tid, cpuid);
+		
+	} 
+	else 
+	{
+		if(insert_bucket(c,t,tid,cpuid) == -1) 
+		{
+			printk(KERN_INFO "No active reservations!\n");
+			return -EBUSY;
+		}
+		printk(KERN_INFO "was able to insert task %d in cpu %d!\n",tid, cpuid);
+	}
+
+	//Setting up CPU affinity using syscall for sched_setaffinity
+	cpumask_clear(&cpumask);
+	cpumask_set_cpu(cpuid, &cpumask);
+
+	//bin TID against a specific CPU
+	if(sched_setaffinity(tid, &cpumask) == -1) {
+		printk(KERN_INFO "Error in setting cpu!\n");
+		return-1;
+	
 	}
 
 	// converting to string
@@ -303,6 +336,7 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 		node->cost_ns = timespec_to_ns(&c);
 		node->actively_running = (tid == current->pid);
 		node->period_remaining_time = node->costDuration;
+		node->startTimer = ktime_get();
 
 		memset(node->dataBuffer,0,BUFFER_SIZE);
 		node->offset = 0;
@@ -314,36 +348,6 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 			createThreadFile(node);
 		}
 
-
-		if(cpuid == -1) {
-			node->cpuid = insert_task(node->C, node->T, node->tid);
-			if(node->cpuid == -1) {
-				printk(KERN_INFO "No active reservations!\n");
-				kfree(node);
-				output = -EBUSY;
-				break;
-			}
-			printk(KERN_INFO "was able to insert task in cpu %d!\n", node->cpuid);
-		} else {
-			node->cpuid = cpuid;
-			if(insert_bucket(node->C,node->T,node->tid,node->cpuid) == -1) {
-				kfree(node);
-				output = -EBUSY;
-				break;
-			}
-			printk(KERN_INFO "was able to insert task in cpu %d!\n", node->cpuid);
-		}
-
-		//Setting up CPU affinity using syscall for sched_setaffinity
-		cpumask_clear(&cpumask);
-		cpumask_set_cpu(node->cpuid, &cpumask);
-
-		//bin TID against a specific CPU
-		if(sched_setaffinity(node->tid, &cpumask) == -1) {
-			printk(KERN_INFO "Error in setting cpu!\n");
-			output = -1;
-			break;
-		}
 
 		// start the timer
 		hrtimer_start(&node->period_timer, node->periodDuration, HRTIMER_MODE_ABS);
