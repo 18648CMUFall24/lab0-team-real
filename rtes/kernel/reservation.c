@@ -114,6 +114,13 @@ static enum hrtimer_restart restart_period(struct hrtimer *timer) {
 		} while (0);
 	}
 
+	if (task->task->state == TASK_DEAD) {
+		put_task_struct(task->task);
+		task->state = DEAD;
+		threadHead.need_housekeeping = true;
+		return HRTIMER_NORESTART;
+	}
+
 	task->period_remaining_time = task->costDuration;
 	task->state = (task->state == RUNNABLE) ? RUNNABLE : MAKE_RUNNABLE;
 	threadHead.need_housekeeping = (task->state == MAKE_RUNNABLE);
@@ -355,7 +362,7 @@ SYSCALL_DEFINE1(cancel_reserve, pid_t, tid)
 	if (pid) {
 		task = pid_task(pid, PIDTYPE_PID); // Get task from `pid`
 		if (task) {
-			put_task_struct(task); // Increment reference count
+			put_task_struct(task); // Decrement reference count
 		}
 	}
 	rcu_read_unlock();

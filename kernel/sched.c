@@ -4290,6 +4290,11 @@ void handle_rt_task_state_updates() {
 				check_preempt_curr(rq, loopedThread->task, 0);
 				task_rq_unlock(rq, loopedThread->task, &rq_flags);
 				loopedThread->state = RUNNABLE;
+				break;
+			case DEAD:
+				printk(KERN_ERR "Removing dead thread %d", loopedThread->tid);
+				removeThreadInScheduleLL(loopedThread->tid);
+				break;
 			default:
 				break;
 		}

@@ -41,23 +41,16 @@ int main(int argc, char *argv[]) {
 
     time_t cost_s = cArg / 1000;
     long int cost_ns = ((long int) cArg % 1000);
-    printf("Cost: %d s %ld ms\n", cost_s, cost_ns);
     cost_ns *= 1000000;
-    printf("Cost: %d s %ld ns\n", cost_s, cost_ns);
 
     time_t period_s = tArg / 1000;
     long int period_ns = ((long int) tArg % 1000);
-    printf("Cost: %d s %ld ms\n", period_s, period_ns);
     period_ns *= 1000000;
-    printf("Cost: %d s %ld ms\n", period_s, period_ns);
 
     cost.tv_sec = cost_s;
-    cost.tv_nsec = cost_ns + 10000000; // Give an extra ms of buffer
+    cost.tv_nsec = cost_ns + 10000000; // Give an extra couple ms of buffer
     period.tv_sec = period_s;
     period.tv_nsec = period_ns;
-
-    printf("Real Cost: %d s %ld ns\n", cost_s, cost_ns);
-    printf("Real Period: %d s %ld ns\n", period_s, period_ns);
 
     set_reserve(0, &cost, &period, cpuArg);
 

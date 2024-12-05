@@ -177,49 +177,44 @@ static struct kobj_attribute energy_attribute =__ATTR(energy, 0660, energy_show,
 //individual energy consumed sysfs File
 static ssize_t taskenergy_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf) 
 {
-    struct threadNode *loopedThread = threadHead.head;
+    struct threadNode *loopedThread; 
     int extractTid;
     int ret = kstrtoint(kobj->name, 10, &extractTid);
     size_t count = 0;
 
-    lockScheduleLL();
     if (ret != 0) {
         printk(KERN_ERR "Failed to convert kobj name to integer, error: %d\n", ret);
-        unlockScheduleLL();
         return count; // Return the error code if conversion fails
     }
 
+    lockScheduleLL();
+    loopedThread = getFirstThreadNode();
+
     //Go through to see if the node is in there
     while(loopedThread != NULL) {
-        if(loopedThread->tid == extractTid)
-        {
+        if(loopedThread->tid == extractTid) {
             break;
         }
         loopedThread = loopedThread->next;
     }
 
     //check if node is found!
-    if(loopedThread != NULL)
-    {
-        //Do Nothing
-    }
-    else
-    {
+    if(loopedThread == NULL) {
         unlockScheduleLL();
         return sprintf(buf, "Thread not found!\n");
     }
 
     unlockScheduleLL();
-    if(energyMonitor)
-    {
+
+    if(energyMonitor) {
         count = sprintf(buf, "%lu\n",loopedThread->energyData.energy);
-    }
-    else
-    {
+    } else {
         count = sprintf(buf, "Energy Monitor not enabled!\n");
     }
+
     return count;
 }
+
 static struct kobj_attribute taskenergy_attribute =__ATTR(energy, 0660, taskenergy_show, NULL);
 
 //Setting or clearing the energy monitoring functionality

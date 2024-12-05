@@ -12,13 +12,14 @@
 // Reading 'enabled' attribute - shows if monitoring is active or not
 static ssize_t reservationStatus_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf) 
 {
-    struct threadNode *loopedThread = threadHead.head;
+    struct threadNode *loopedThread;
     struct task_struct *task = NULL;
     int len = 0;
 
+    lockScheduleLL();
+    loopedThread = getFirstThreadNode();
     if(loopedThread != NULL)
     {
-        lockScheduleLL();
         len += sprintf(buf + len, "TID\tPID\tPRIO\tCPU\tNAME \n");
         while(loopedThread != NULL)
         {
@@ -50,6 +51,7 @@ static ssize_t reservationStatus_show(struct kobject *kobj, struct kobj_attribut
     }
     else
     {
+        unlockScheduleLL();
         return sprintf(buf, "No Active Tasks in the Reservation!\n");
     }
 

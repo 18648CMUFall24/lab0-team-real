@@ -26,6 +26,7 @@ enum task_mode {
     SUSPENDED,
     MAKE_RUNNABLE,
     RUNNABLE,
+    DEAD,
 };
 
 struct energy_data {
