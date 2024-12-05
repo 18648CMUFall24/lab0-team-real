@@ -52,7 +52,12 @@ int main(int argc, char *argv[]) {
     period.tv_sec = period_s;
     period.tv_nsec = period_ns;
 
-    set_reserve(0, &cost, &period, cpuArg);
+    int returnSys = set_reserve(0, &cost, &period, cpuArg);
+    if(returnSys < 0)
+    {
+        printf("Error in set reserve!\n");
+        return 0;
+    }
 
     while(1) {
         clock_t start = clock();
