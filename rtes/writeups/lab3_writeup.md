@@ -26,3 +26,14 @@ does it use to make the decision?
 
 The Power Management system decides which sleep state the processor enters. Its parameters it uses is the system load, latency, and power conumpsion to make its decisions.
 
+6.  Compare the total energy consumption over an interval of one minute for the WFD and BFD policies with
+that of LST policy for at least five randomly-generated tasksets of varying total utilization with at least five
+tasks in each.
+Present your results in the writeup as a plot of average energy vs total taskset utilization with at least
+five utilization levels. Each data point would be an average of total energy across five tasksets. Include an
+interpretation of your results.
+
+We can see with our LST algorithm, the energy consumption is slgihtly worse since our LST is based on WF and enabled the CPU when doing the bin packing. This causes the enrgy to be consumed more since more CPU's are being used in this process compared to WF. The reason BF is better in terms of energy consumption is because it try to use the best core to bin the task against which worse fit doesn't which in turns use less CPU and in turn cause less energy to be consumed.
+
+![image](https://github.com/user-attachments/assets/984b6fae-bc04-49e3-87e1-9e6b997817dd)
+
