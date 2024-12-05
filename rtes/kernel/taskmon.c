@@ -28,9 +28,9 @@ static ssize_t util_file_show(struct kobject *kobj, struct kobj_attribute *attr,
         printk(KERN_ERR "Failed to convert attr name to integer, error: %d\n", ret);
         return count; // Return the error code if conversion fails
     }
-    
+
     lockScheduleLL();
-    
+
 
     loopedThread = findThreadInScheduleLL(extractTid);
 
@@ -44,7 +44,7 @@ static ssize_t util_file_show(struct kobject *kobj, struct kobj_attribute *attr,
         loopedThread = loopedThread->next;
     }
     */
-       
+
 
     if(loopedThread == NULL) {
         unlockScheduleLL();
@@ -58,7 +58,7 @@ static ssize_t util_file_show(struct kobject *kobj, struct kobj_attribute *attr,
         strncpy(buf, loopedThread->dataBuffer, loopedThread->offset);
         memset(loopedThread->dataBuffer,0,BUFFER_SIZE);
         loopedThread->offset = 0;
-        
+
         unlockScheduleLL();
         return offset;
     } else {
@@ -88,7 +88,7 @@ int createThreadFile(struct threadNode *thread)
         kfree(threadAtt);
         return -ENOMEM;
     }
-    
+
     snprintf((char *)threadAtt->attr.name, 16, "%d", thread->tid);
     //printk(KERN_INFO "File name: %s\n", threadAtt->attr.name);
 
@@ -122,7 +122,7 @@ int removeThreadFile(struct threadNode  *thread)
     // Remove the kobject
     kfree(thread->thread_obj->attr.name);
     kfree(thread->thread_obj);
-    
+
     removeEnergyThreadFile(thread);
 
     return 0;
@@ -137,7 +137,7 @@ static ssize_t monitoring_control_show(struct kobject *kobj, struct kobj_attribu
         return sprintf(buf, "%d\n", 1);
     }
     else
-    {
+{
         return sprintf(buf, "%d\n", 0);
     }
 
@@ -154,7 +154,7 @@ static ssize_t monitoring_control_store(struct kobject *kobj, struct kobj_attrib
     } else if (buf[0] == '0') {
         monitoring_active = false;
         // Stop data collection and cleanup
-        
+
     }
 
     mutex_unlock(&monitoring_lock);
@@ -176,7 +176,7 @@ static int __init taskmon_init(void) {
     {
         return -ENOMEM;
     }
-    
+
     //create taskmon directory
     taskmon_kobject = kobject_create_and_add("taskmon", rtes_kobject);
     if(!taskmon_kobject)
@@ -211,7 +211,10 @@ static int __init taskmon_init(void) {
 
     //calculate power and frequency
     energyCalc_init();
-    
+
+    //Initializing the partition sysfs
+    partition_init();
+
     printk(KERN_INFO "sysfs files created at /sys/rtes/.\n");
 
     return 0;
@@ -230,6 +233,8 @@ static void __exit taskmon_exit(void) {
     //delete the energy tracking directories and files
     energyTracking_exit();
 
+    //delete the partition exit
+    partition_exit();
 
     //delete the directory
     kobject_put(taskmon_kobj);

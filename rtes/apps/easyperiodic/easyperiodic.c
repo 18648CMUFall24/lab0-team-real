@@ -47,19 +47,26 @@ int main(int argc, char *argv[]) {
     long int period_ns = ((long int) tArg % 1000);
     period_ns *= 1000000;
 
+    // Give an extra 50 ms of buffer on the cost
+    // so that end_job can do it's magic without race condition from enforcer
     cost.tv_sec = cost_s;
-    cost.tv_nsec = cost_ns + 10000000; // Give an extra couple ms of buffer
+    cost.tv_nsec = cost_ns + 50000000; 
     period.tv_sec = period_s;
     period.tv_nsec = period_ns;
 
-    set_reserve(0, &cost, &period, cpuArg);
+    int returnSys = set_reserve(0, &cost, &period, cpuArg);
+    if(returnSys < 0)
+    {
+        printf("Error in set reserve!\n");
+        return 0;
+    }
 
     while(1) {
         clock_t start = clock();
         clock_t clocks_periodElapsedTime = 0;
 
-        printf("Started period...");
-        fflush(stdout);
+        //printf("Started period...");
+        //fflush(stdout);
 
         // pretend to do busy work
         while(clocks_periodElapsedTime < clocks_running)
@@ -67,8 +74,8 @@ int main(int argc, char *argv[]) {
             clocks_periodElapsedTime = (clock() - start);
         }
 
-        printf("finished work.\n");
-        fflush(stdout);
+        //printf("finished work.\n");
+        //fflush(stdout);
         end_job();
     }
 

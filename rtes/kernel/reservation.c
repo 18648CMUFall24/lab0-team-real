@@ -54,26 +54,26 @@ void unlockScheduleLL() {
 }
 
 void pause_timer(struct threadNode *task) {
-	printk(KERN_NOTICE "pause_timer");
+	//printk(KERN_NOTICE "pause_timer");
 	task->period_remaining_time = hrtimer_get_remaining(&task->cost_timer);
 	hrtimer_cancel(&task->cost_timer);
 }
 
 void resume_timer(struct threadNode *task) {
-	printk(KERN_NOTICE "resume_timer");
+	//printk(KERN_NOTICE "resume_timer");
 	hrtimer_start(&task->cost_timer, task->period_remaining_time, HRTIMER_MODE_REL);
 }
 
 static enum hrtimer_restart end_of_reserved_time(struct hrtimer *timer) {
 	struct threadNode *task; 
 
-	printk(KERN_NOTICE "end_of_reserved_time");
+	//printk(KERN_NOTICE "end_of_reserved_time");
 	task = container_of(timer, struct threadNode, cost_timer);
 	task->state = MAKE_SUSPEND;
 	task->task->state = TASK_UNINTERRUPTIBLE;
 	threadHead.need_housekeeping = true;
 
-	set_tsk_need_resched(current);
+	//set_tsk_need_resched(current);
 	return HRTIMER_NORESTART;
 }
 
@@ -83,10 +83,10 @@ static enum hrtimer_restart restart_period(struct hrtimer *timer) {
 	int ret;
 	struct threadNode *task; 
 
-	printk(KERN_NOTICE "restart_period");
+	//printk(KERN_NOTICE "restart_period");
 	task = container_of(timer, struct threadNode, period_timer);
 
-	
+
 	energyCalc(task);
 
 
@@ -128,7 +128,7 @@ static enum hrtimer_restart restart_period(struct hrtimer *timer) {
 
 	hrtimer_forward_now(timer, task->periodDuration);
 
-	set_tsk_need_resched(current);
+	//set_tsk_need_resched(current);
 	return HRTIMER_RESTART;
 }
 
@@ -141,15 +141,15 @@ void rtesDescheduleTask(struct task_struct *task) {
 	do {
 		node = findThreadInScheduleLL(task->pid);
 		if (node == NULL) break;
-		printk(KERN_NOTICE "rtesDescheduleTask");
+		//printk(KERN_NOTICE "rtesDescheduleTask");
 
 		if (!(node->actively_running)) break; // Don't double deschedule
 		node->actively_running = false;
 
 		// Accumulate time running this period
 		pause_timer(node);
-		printk(KERN_ERR "[KERN] Descheduling task %d. Time Remaining: %lld", 
-			node->tid, ktime_to_us(node->period_remaining_time));
+		//printk(KERN_ERR "[KERN] Descheduling task %d. Time Remaining: %lld", 
+	 //node->tid, ktime_to_us(node->period_remaining_time));
 
 	} while (0);
 	unlockScheduleLL();
@@ -165,14 +165,14 @@ void  rtesScheduleTask(struct task_struct *task) {
 	do {
 		node = findThreadInScheduleLL(task->pid);
 		if (node == NULL) break;
-		printk(KERN_NOTICE "rtesScheduleTask");
+		//printk(KERN_NOTICE "rtesScheduleTask");
 
 
 		if (node->actively_running) break; // Don't double schedule
 		node->actively_running = true;
-		
-		printk(KERN_ERR "[KERN] Scheduling task %d. Time Remaining: %lld", 
-			node->tid, ktime_to_us(node->period_remaining_time));
+
+		//printk(KERN_ERR "[KERN] Scheduling task %d. Time Remaining: %lld", 
+	 //node->tid, ktime_to_us(node->period_remaining_time));
 
 		resume_timer(node);
 
@@ -193,9 +193,9 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 	int ret;
 	bool exists = false;
 
-	printk(KERN_NOTICE "sys_set_reserve");
+	//printk(KERN_NOTICE "sys_set_reserve");
 
-	if (cpuid < 0 || cpuid > 3) {
+	if (cpuid < -1 || cpuid > 3) {
 		printk(KERN_INFO "CPU ID does not exist!\n");
 		return EINVAL;
 	}
@@ -226,15 +226,7 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 		return -EFAULT;
 	}
 
-	// Setting up CPU affinity using syscall for sched_setaffinity
-	cpumask_clear(&cpumask);
-	cpumask_set_cpu(cpuid, &cpumask);
 
-	//bin TID against a specific CPU
-	if(sched_setaffinity(tid, &cpumask) == -1) {
-		printk(KERN_INFO "Error in setting cpu!\n");
-		return -1;
-	}
 
 	if (!task) {
 		rcu_read_lock();
@@ -254,6 +246,39 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 		return -EFAULT;
 	}
 
+	//try to set the affinity
+	if(cpuid == -1) 
+	{
+		cpuid = insert_task(c, t, tid);
+		if(cpuid == -1) 
+		{
+			printk(KERN_INFO "No active reservations!\n");
+			return -EBUSY;
+		}
+		printk(KERN_INFO "was able to insert task %d in cpu %d!\n", tid, cpuid);
+		
+	} 
+	else 
+	{
+		if(insert_bucket(c,t,tid,cpuid) == -1) 
+		{
+			printk(KERN_INFO "No active reservations!\n");
+			return -EBUSY;
+		}
+		printk(KERN_INFO "was able to insert task %d in cpu %d!\n",tid, cpuid);
+	}
+
+	//Setting up CPU affinity using syscall for sched_setaffinity
+	cpumask_clear(&cpumask);
+	cpumask_set_cpu(cpuid, &cpumask);
+
+	//bin TID against a specific CPU
+	if(sched_setaffinity(tid, &cpumask) == -1) {
+		printk(KERN_INFO "Error in setting cpu!\n");
+		return-1;
+	
+	}
+
 	// converting to string
 	cost.whole = ktime_to_ms(timespec_to_ktime(c));
 	cost.decimal = 0;
@@ -267,9 +292,9 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 
 	// Calculate the utilization
 	printk(KERN_INFO "Cost = %c%hd.%hd", 
-		cost.negative ? '-':' ', cost.whole, cost.decimal);
+	cost.negative ? '-':' ', cost.whole, cost.decimal);
 	printk(KERN_INFO "Period = %c%hd.%hd", 
-		period.negative ? '-':' ', period.whole, period.decimal);
+	period.negative ? '-':' ', period.whole, period.decimal);
 	ret = structured_calc(cost, period, '/', &util);
 	if (ret != 0 || util.negative || (util.whole == 1 && util.decimal != 0) || util.whole > 1) {
 		printk(KERN_ERR "calc failed with error: %d\n", ret);
@@ -306,15 +331,16 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 		node->T = t;
 		node->task = task;
 		node->tid = tid;
-		node->cpuid = cpuid;
 		node->periodDuration = timespec_to_ktime(t);
 		node->costDuration = timespec_to_ktime(c);
 		node->cost_ns = timespec_to_ns(&c);
 		node->actively_running = (tid == current->pid);
 		node->period_remaining_time = node->costDuration;
-		
+		node->startTimer = ktime_get();
+
 		memset(node->dataBuffer,0,BUFFER_SIZE);
 		node->offset = 0;
+		node->cpuid = cpuid;
 
 
 		// Creating thread utilziation file if nodes is not already exist
@@ -322,15 +348,17 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 			createThreadFile(node);
 		}
 
+
 		// start the timer
 		hrtimer_start(&node->period_timer, node->periodDuration, HRTIMER_MODE_ABS);
-		
+
 		if (node->actively_running) {
 			hrtimer_start(&node->cost_timer, node->costDuration, HRTIMER_MODE_REL);
 		}
 
 	} while (0);
 	debugPrints();
+	print_buckets();
 
 	// threadHead.need_housekeeping = true;
 	unlockScheduleLL();
@@ -344,7 +372,7 @@ SYSCALL_DEFINE1(cancel_reserve, pid_t, tid)
 	struct task_struct *task = NULL;
 	int output;
 
-	printk(KERN_NOTICE "sys_cancel_reserve");
+	printk(KERN_NOTICE "sys_cancel_reserve\n");
 
 	// If tid is 0, use current thread's pid
 	if (tid == 0) {
@@ -354,6 +382,7 @@ SYSCALL_DEFINE1(cancel_reserve, pid_t, tid)
 	lockScheduleLL();
 	output = removeThreadInScheduleLL(tid);
 	debugPrints();
+	print_buckets();
 	unlockScheduleLL();
 
 
@@ -374,7 +403,7 @@ SYSCALL_DEFINE0(end_job) {
 	struct threadNode *task;
 	long output = EFAULT;
 
-	printk(KERN_NOTICE "sys_end_job");
+	//printk(KERN_NOTICE "sys_end_job\n");
 
 	lockScheduleLL();
 	do {
@@ -382,7 +411,7 @@ SYSCALL_DEFINE0(end_job) {
 		if (task) {
 			if (!(task->actively_running)) break; // Don't double deschedule
 			pause_timer(task);
-			printk(KERN_ERR "Called end_job from task %d", task->tid);
+			//printk(KERN_ERR "Called end_job from task %d", task->tid);
 
 			task->actively_running = false;
 			task->state = MAKE_SUSPEND;
@@ -396,6 +425,7 @@ SYSCALL_DEFINE0(end_job) {
 
 	set_tsk_need_resched(current);
 
+	turnOffUnusedProcessors();
 	return output;
 }
 
@@ -436,6 +466,9 @@ int removeThreadInScheduleLL(pid_t tid) {
 			//cancel timers
 			hrtimer_cancel(&loopedThread->cost_timer);
 			hrtimer_cancel(&loopedThread->period_timer);
+
+			remove_task_from_bucket(loopedThread->tid, loopedThread->cpuid);
+
 			kfree(loopedThread);
 			amountReserved--;
 			return 0;
@@ -462,12 +495,12 @@ void debugPrints() {
 
 	while (loopedThread != NULL) {
 		printk(KERN_NOTICE "[%px] Thread ID: %lld, CPU ID: %lld, Period Duration: %llu, Cost: %llu\n", 
-		 (void *) loopedThread,
-		 (long long)loopedThread->tid, 
-		 (long long)loopedThread->cpuid, 
-		 (unsigned long long)ktime_to_us(loopedThread->periodDuration), 
-		 (unsigned long long)ktime_to_us(loopedThread->costDuration)
-		 );
+	 (void *) loopedThread,
+	 (long long)loopedThread->tid, 
+	 (long long)loopedThread->cpuid, 
+	 (unsigned long long)ktime_to_us(loopedThread->periodDuration), 
+	 (unsigned long long)ktime_to_us(loopedThread->costDuration)
+	 );
 
 		loopedThread = loopedThread->next;
 	}
