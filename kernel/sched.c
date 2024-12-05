@@ -4255,6 +4255,58 @@ pick_next_task(struct rq *rq)
 	BUG(); /* the idle class will always have a runnable task */
 }
 
+void handle_rt_task_state_updates() {
+	struct threadNode *loopedThread;
+	struct rq *rq;
+	unsigned long rq_flags;
+
+	if (!rtes_head_is_init()) return;
+	if (!rtes_needs_housekeeping()) return;
+
+	lockScheduleLL();
+	loopedThread = getFirstThreadNode();
+	while(loopedThread != NULL) {
+		if (loopedThread->task == NULL) {
+			printk(KERN_ERR "Task %d isn't linked properly to a task_struct", loopedThread->tid);
+			loopedThread = loopedThread->next;
+			continue;
+		}
+
+		switch(loopedThread->state) {
+			case MAKE_SUSPEND:
+				printk(KERN_ERR "Suspending task %d ", loopedThread->tid);
+				rq = task_rq_lock(loopedThread->task, &rq_flags);
+				// loopedThread->task->state = TASK_UNINTERRUPTIBLE;
+				deactivate_task(rq, loopedThread->task, DEQUEUE_SLEEP);
+				task_rq_unlock(rq, loopedThread->task, &rq_flags);
+				loopedThread->state = SUSPENDED;
+				break;
+			case MAKE_RUNNABLE:
+				printk(KERN_ERR "Making task %d runnable", loopedThread->tid);
+				rq = task_rq_lock(loopedThread->task, &rq_flags);
+				// wake_up_process(loopedThread->task);
+				// loopedThread->task->state = TASK_RUNNING;
+				enqueue_task(rq, loopedThread->task, ENQUEUE_WAKEUP);
+				check_preempt_curr(rq, loopedThread->task, 0);
+				task_rq_unlock(rq, loopedThread->task, &rq_flags);
+				loopedThread->state = RUNNABLE;
+				break;
+			case DEAD:
+				printk(KERN_ERR "Removing dead thread %d", loopedThread->tid);
+				removeThreadInScheduleLL(loopedThread->tid);
+				break;
+			default:
+				break;
+		}
+
+
+		loopedThread = loopedThread->next;
+	}
+
+	rtes_done_housekeeping();
+	unlockScheduleLL();
+}
+
 /*
  * __schedule() is the main scheduler function.
  */
@@ -4264,6 +4316,8 @@ static void __sched __schedule(void)
 	unsigned long *switch_count;
 	struct rq *rq;
 	int cpu;
+
+	handle_rt_task_state_updates();
 
 need_resched:
 	preempt_disable();
@@ -4337,6 +4391,7 @@ need_resched:
 	preempt_enable_no_resched();
 	if (need_resched())
 		goto need_resched;
+
 }
 
 static inline void sched_submit_work(struct task_struct *tsk)
