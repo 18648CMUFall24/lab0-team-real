@@ -54,20 +54,20 @@ void unlockScheduleLL() {
 }
 
 void pause_timer(struct threadNode *task) {
-	printk(KERN_NOTICE "pause_timer");
+	//printk(KERN_NOTICE "pause_timer");
 	task->period_remaining_time = hrtimer_get_remaining(&task->cost_timer);
 	hrtimer_cancel(&task->cost_timer);
 }
 
 void resume_timer(struct threadNode *task) {
-	printk(KERN_NOTICE "resume_timer");
+	//printk(KERN_NOTICE "resume_timer");
 	hrtimer_start(&task->cost_timer, task->period_remaining_time, HRTIMER_MODE_REL);
 }
 
 static enum hrtimer_restart end_of_reserved_time(struct hrtimer *timer) {
 	struct threadNode *task; 
 
-	printk(KERN_NOTICE "end_of_reserved_time");
+	//printk(KERN_NOTICE "end_of_reserved_time");
 	task = container_of(timer, struct threadNode, cost_timer);
 	task->state = MAKE_SUSPEND;
 	task->task->state = TASK_UNINTERRUPTIBLE;
@@ -83,7 +83,7 @@ static enum hrtimer_restart restart_period(struct hrtimer *timer) {
 	int ret;
 	struct threadNode *task; 
 
-	printk(KERN_NOTICE "restart_period");
+	//printk(KERN_NOTICE "restart_period");
 	task = container_of(timer, struct threadNode, period_timer);
 
 
@@ -141,15 +141,15 @@ void rtesDescheduleTask(struct task_struct *task) {
 	do {
 		node = findThreadInScheduleLL(task->pid);
 		if (node == NULL) break;
-		printk(KERN_NOTICE "rtesDescheduleTask");
+		//printk(KERN_NOTICE "rtesDescheduleTask");
 
 		if (!(node->actively_running)) break; // Don't double deschedule
 		node->actively_running = false;
 
 		// Accumulate time running this period
 		pause_timer(node);
-		printk(KERN_ERR "[KERN] Descheduling task %d. Time Remaining: %lld", 
-	 node->tid, ktime_to_us(node->period_remaining_time));
+		//printk(KERN_ERR "[KERN] Descheduling task %d. Time Remaining: %lld", 
+	 //node->tid, ktime_to_us(node->period_remaining_time));
 
 	} while (0);
 	unlockScheduleLL();
@@ -165,14 +165,14 @@ void  rtesScheduleTask(struct task_struct *task) {
 	do {
 		node = findThreadInScheduleLL(task->pid);
 		if (node == NULL) break;
-		printk(KERN_NOTICE "rtesScheduleTask");
+		//printk(KERN_NOTICE "rtesScheduleTask");
 
 
 		if (node->actively_running) break; // Don't double schedule
 		node->actively_running = true;
 
-		printk(KERN_ERR "[KERN] Scheduling task %d. Time Remaining: %lld", 
-	 node->tid, ktime_to_us(node->period_remaining_time));
+		//printk(KERN_ERR "[KERN] Scheduling task %d. Time Remaining: %lld", 
+	 //node->tid, ktime_to_us(node->period_remaining_time));
 
 		resume_timer(node);
 
@@ -193,7 +193,7 @@ SYSCALL_DEFINE4(set_reserve, pid_t, tid, struct timespec*, C , struct timespec*,
 	int ret;
 	bool exists = false;
 
-	printk(KERN_NOTICE "sys_set_reserve");
+	//printk(KERN_NOTICE "sys_set_reserve");
 
 	if (cpuid < -1 || cpuid > 3) {
 		printk(KERN_INFO "CPU ID does not exist!\n");
@@ -372,7 +372,7 @@ SYSCALL_DEFINE1(cancel_reserve, pid_t, tid)
 	struct task_struct *task = NULL;
 	int output;
 
-	printk(KERN_NOTICE "sys_cancel_reserve");
+	printk(KERN_NOTICE "sys_cancel_reserve\n");
 
 	// If tid is 0, use current thread's pid
 	if (tid == 0) {
@@ -403,7 +403,7 @@ SYSCALL_DEFINE0(end_job) {
 	struct threadNode *task;
 	long output = EFAULT;
 
-	printk(KERN_NOTICE "sys_end_job");
+	//printk(KERN_NOTICE "sys_end_job\n");
 
 	lockScheduleLL();
 	do {
@@ -411,7 +411,7 @@ SYSCALL_DEFINE0(end_job) {
 		if (task) {
 			if (!(task->actively_running)) break; // Don't double deschedule
 			pause_timer(task);
-			printk(KERN_ERR "Called end_job from task %d", task->tid);
+			//printk(KERN_ERR "Called end_job from task %d", task->tid);
 
 			task->actively_running = false;
 			task->state = MAKE_SUSPEND;
